@@ -37,6 +37,7 @@ trap 'rm -rf "${workspace}"' EXIT
 : "${MANNY_LED_STATE_PATH:=}"
 : "${MANNY_DISPLAY_BRIGHTNESS_PATH:=}"
 : "${MANNY_LLM_BASE_URL:=http://127.0.0.1:8080}"
+: "${MANNY_CAMERA_ENABLED:=false}"
 capture_seconds=2
 
 section() { printf '\n== %s ==\n' "$1"; }
@@ -75,8 +76,12 @@ check 'Raspberry Pi model' bash -c 'grep -qi raspberry /proc/device-tree/model'
 check 'Python 3.12 or newer' python3 -c 'import sys; raise SystemExit(sys.version_info < (3, 12))'
 
 section 'Prerequisites'
-check 'camera command' command -v rpicam-hello
-check 'camera detected' rpicam-hello --list-cameras
+if [[ "${MANNY_CAMERA_ENABLED}" == true ]]; then
+  check 'camera command' command -v rpicam-hello
+  check 'camera detected' rpicam-hello --list-cameras
+else
+  skip 'camera' 'MANNY_CAMERA_ENABLED is false'
+fi
 check 'audio capture utility' command -v arecord
 check 'audio playback utility' command -v aplay
 check 'audio capture device' bash -c 'arecord -l | grep -q card'
@@ -181,7 +186,9 @@ if (( loopback == 1 && audio == 1 )); then
 fi
 
 section 'Camera'
-if ! command -v rpicam-still >/dev/null 2>&1; then
+if [[ "${MANNY_CAMERA_ENABLED}" != true ]]; then
+  skip 'camera checks' 'camera disabled for this device'
+elif ! command -v rpicam-still >/dev/null 2>&1; then
   skip 'capture a frame' 'rpicam-still not installed'
 else
   frame="${workspace}/frame.jpg"
@@ -193,13 +200,17 @@ else
   fi
 fi
 
-if python3 -c 'import picamera2' >/dev/null 2>&1; then
+if [[ "${MANNY_CAMERA_ENABLED}" != true ]]; then
+  :
+elif python3 -c 'import picamera2' >/dev/null 2>&1; then
   ok 'picamera2 importable (required by the runtime adapter)'
 else
   absent 'picamera2 python module'
 fi
 
-if python3 -c 'import cv2' >/dev/null 2>&1; then
+if [[ "${MANNY_CAMERA_ENABLED}" != true ]]; then
+  :
+elif python3 -c 'import cv2' >/dev/null 2>&1; then
   ok 'opencv importable (MANNY_PERSON_DETECTOR=opencv_hog)'
 else
   skip 'opencv person detector' 'python3-opencv not installed; presence stays 0'

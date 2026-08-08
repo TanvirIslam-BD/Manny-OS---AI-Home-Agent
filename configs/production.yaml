@@ -3,7 +3,7 @@ hardware_mode: real
 audio_device: default
 mcp_mode: remote_http
 mcp_token_storage: keyring
-camera_enabled: true
+camera_enabled: false
 face_recognition_enabled: false
 api_host: 127.0.0.1
 api_port: 8765
@@ -24,9 +24,9 @@ llm_timeout_seconds: 60
 llm_max_tokens: 320
 llm_context_turns: 6
 
-# One multimodal model answers text and describes the camera view, so both point
-# at the same llama-server. Measure memory and latency on the device before
-# enabling scene description alongside speech recognition.
-vision_language_backend: llama_cpp
+# Camera deferred: no sensor selected yet, and vision is the largest latency and
+# memory cost on the device. Set camera_enabled true, install a multimodal model
+# with its projector, and switch this to llama_cpp to turn scene description on.
+vision_language_backend: none
 vision_language_base_url: http://127.0.0.1:8080
 vision_language_model: gemma-3-4b-it

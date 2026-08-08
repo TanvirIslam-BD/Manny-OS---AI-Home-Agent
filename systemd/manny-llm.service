@@ -7,8 +7,9 @@ Type=simple
 User=manny
 Group=manny
 WorkingDirectory=/opt/manny
-# --mmproj loads the vision projector; without it the model cannot accept images.
-ExecStart=/opt/manny/llama.cpp/build/bin/llama-server -m /opt/manny/models/gemma-3-4b-it-Q4_K_M.gguf --mmproj /opt/manny/models/gemma-3-4b-it-mmproj-F16.gguf --alias gemma-3-4b-it --host 127.0.0.1 --port 8080 --ctx-size 4096 --threads 4 --parallel 1
+# Text only while the camera is deferred. To enable scene description, install the
+# projector and add: --mmproj /opt/manny/models/gemma-3-4b-it-mmproj-F16.gguf
+ExecStart=/opt/manny/llama.cpp/build/bin/llama-server -m /opt/manny/models/gemma-3-4b-it-Q4_K_M.gguf --alias gemma-3-4b-it --host 127.0.0.1 --port 8080 --ctx-size 4096 --threads 4 --parallel 1
 Restart=on-failure
 RestartSec=3
 TimeoutStopSec=20

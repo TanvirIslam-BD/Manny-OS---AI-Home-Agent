@@ -111,6 +111,15 @@ conversation must not leave the device.
 
 Consequences: a larger memory and latency budget on 8 GB hardware, shared with
 speech recognition, synthesis, and the browser. The systemd ceiling moves from
-5 GB to 6 GB and the service loads a vision projector. These are starting values,
-not measurements — latency, thermals, and memory under simultaneous speech and
-vision load remain an open hardware gate.
+5 GB to 6 GB. These are starting values, not measurements — latency and thermals
+under load remain an open hardware gate.
+
+Amendment: the camera is deferred until a sensor is selected, so device profiles
+ship with camera_enabled false and vision_language_backend none, and the service
+does not load a projector. The multimodal model is retained for its stronger
+instruction-following and multilingual quality; scene description is a
+configuration change away once hardware is chosen.
+
+While the camera is off, presence is always absent. MULTIPLE_PEOPLE cannot occur,
+so the automatic masking of financial values when others are nearby does not
+engage and the passcode is the only gate on private views.
