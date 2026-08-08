@@ -485,10 +485,9 @@ svg { width: 1.3rem; height: 1.3rem; }
   .device__halo { top: 12px; height: 10px; }
   .device__bezel { padding: 8px; }
   .screen { padding: 18px 17px 10px; }
-  .face { min-height: 100px; }
+  .face { min-height: 68px; }
   .card { min-height: 65px; padding: 8px; }
   .card header small { display: none; }
-  .ask-button { flex: 0 0 auto; bottom: 50px; }
   .screen__nav { height: 43px; }
   .controls__heading h1 { font-size: 2.55rem; }
   .state-grid { grid-template-columns: repeat(2, 1fr); }
@@ -573,7 +572,7 @@ svg { width: 1.3rem; height: 1.3rem; }
 .simulator-shell--kiosk .device-settings__language select { min-height: 7.5vmin; font-size: 2.4vmin; }
 .simulator-shell--kiosk .device-settings__facts dt,
 .simulator-shell--kiosk .device-settings__facts dd { font-size: 2.3vmin; }
-.simulator-shell--kiosk .ask-button { flex: 0 0 auto; min-height: 9vmin; font-size: 2.6vmin; }
+.simulator-shell--kiosk .ask-button { min-height: 9vmin; font-size: 2.6vmin; }
 .simulator-shell--kiosk .screen__nav { height: 12vmin; }
 .simulator-shell--kiosk .screen__nav button { font-size: 2vmin; }
 .simulator-shell--kiosk .screen__nav svg { width: 4vmin; height: 4vmin; }
