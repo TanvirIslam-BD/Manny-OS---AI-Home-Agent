@@ -374,6 +374,11 @@ svg { width: 1.3rem; height: 1.3rem; }
 .device-panel strong { font: 700 .82rem/1.25 Manrope, sans-serif; }
 .device-panel p { margin: 0; color: #8299ab; font-size: .58rem; line-height: 1.45; }
 .device-panel code { align-self: flex-start; margin-top: 4px; padding: 6px 9px; color: var(--teal); border-radius: 7px; background: rgba(38,239,196,.08); font-size: .62rem; letter-spacing: .08em; }
+.device-settings__facts { margin: 4px 0 0; display: flex; flex-direction: column; gap: 4px; }
+.device-settings__facts > div { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.device-settings__facts dt { color: #8299ab; font-size: .55rem; letter-spacing: .06em; text-transform: uppercase; }
+.device-settings__facts dd { margin: 0; color: #dff9ff; font-size: .58rem; text-align: right; }
+.device-panel > button[disabled] { opacity: .45; cursor: not-allowed; }
 .device-panel > button, .device-panel__actions button { min-height: 34px; padding: 6px 10px; color: #dff9ff; border: 1px solid rgba(40,197,255,.3); border-radius: 8px; background: #0a2942; font-size: .58rem; cursor: pointer; }
 .device-panel__actions { display: flex; gap: 8px; margin-top: 4px; }
 .device-panel__actions button:first-child { color: #06111d; border: 0; background: linear-gradient(135deg, #62dcff, #26efc4); font-weight: 800; }

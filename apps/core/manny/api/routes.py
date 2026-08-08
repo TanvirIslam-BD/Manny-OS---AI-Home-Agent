@@ -51,6 +51,10 @@ class VoiceSimulationResponse(BaseModel):
     language: str = "en"
 
 
+class ListeningRequest(BaseModel):
+    enabled: bool
+
+
 class DeviceResetRequest(BaseModel):
     confirmation: Literal["RESET MANNY"]
 
@@ -188,6 +192,13 @@ async def privacy_lock(services: Services) -> RuntimeSnapshot:
         message="Privacy locked",
         privacy=PrivacyState.PRIVACY_LOCKED,
     )
+
+
+@router.post("/device/listening", response_model=RuntimeSnapshot)
+async def set_listening(body: ListeningRequest, services: Services) -> RuntimeSnapshot:
+    if not services.state.snapshot.listening_available:
+        raise HTTPException(status_code=409, detail="the device listen loop is unavailable")
+    return await services.set_listening(body.enabled)
 
 
 @router.post("/device/reset", response_model=RuntimeSnapshot)

@@ -1,4 +1,4 @@
-import type { AgentResponse, FinanceDashboardData, MannyEvent, MCPStatus, RuntimeSnapshot, RuntimeState, VoiceResponse } from '../types'
+import type { AgentResponse, FinanceDashboardData, MannyEvent, MCPStatus, PublicSettings, RuntimeSnapshot, RuntimeState, VoiceResponse } from '../types'
 
 export async function askManny(text: string, language?: string): Promise<AgentResponse> {
   return postJson('/api/agent/query', { text, language })
@@ -39,6 +39,16 @@ export async function setPresence(people_count: number): Promise<RuntimeSnapshot
 
 export async function pushToTalk(): Promise<RuntimeSnapshot> {
   return postJson('/api/interaction/push-to-talk', {})
+}
+
+export async function setListening(enabled: boolean): Promise<RuntimeSnapshot> {
+  return postJson('/api/device/listening', { enabled })
+}
+
+export async function getPublicSettings(signal?: AbortSignal): Promise<PublicSettings> {
+  const response = await fetch('/api/settings/public', { signal })
+  if (!response.ok) throw new Error(`Settings request failed: ${response.status}`)
+  return response.json() as Promise<PublicSettings>
 }
 
 export async function getMcpStatus(signal?: AbortSignal): Promise<MCPStatus> {

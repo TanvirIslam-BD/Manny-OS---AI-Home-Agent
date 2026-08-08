@@ -70,6 +70,29 @@ class RuntimeServices:
             await self.vision.start()
         if self.voice_loop is not None:
             await self.voice_loop.start()
+        await self.state.transition(
+            self.state.snapshot.state,
+            force=True,
+            message=self.state.snapshot.status_message,
+            listening_enabled=self.voice_loop is not None,
+            listening_available=self.voice_loop is not None,
+        )
+
+    async def set_listening(self, enabled: bool) -> RuntimeSnapshot:
+        """Start or stop the device listen loop without restarting the service."""
+
+        if self.voice_loop is None:
+            return self.state.snapshot
+        if enabled:
+            await self.voice_loop.start()
+        else:
+            await self.voice_loop.stop()
+        return await self.state.transition(
+            self.state.snapshot.state,
+            force=True,
+            message="Always listening is on" if enabled else "Always listening is off",
+            listening_enabled=enabled,
+        )
 
     async def stop(self) -> None:
         if self.voice_loop is not None:
@@ -233,7 +256,7 @@ def build_services(settings: Settings) -> RuntimeServices:
                 state,
                 chunk_seconds=settings.voice_capture_seconds,
             )
-            if settings.voice_loop_enabled
+            if settings.voice_loop_active
             else None
         ),
         finance_cache=finance_cache,

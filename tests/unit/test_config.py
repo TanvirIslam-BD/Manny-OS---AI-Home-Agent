@@ -67,3 +67,20 @@ def test_public_settings_advertise_multilingual_voice() -> None:
     assert isinstance(voice, dict)
     assert voice["automaticDetection"] is True
     assert voice["majorLanguages"]["bn"] == "বাংলা"
+
+
+def test_voice_loop_is_on_by_default_but_only_runs_on_real_hardware() -> None:
+    desktop = Settings(hardware_mode="mock", _env_file=None)
+    device = Settings(hardware_mode="real", audio_device="default", _env_file=None)
+
+    assert desktop.voice_loop_enabled is True
+    assert desktop.voice_loop_active is False
+    assert device.voice_loop_active is True
+
+    disabled = Settings(
+        hardware_mode="real",
+        audio_device="default",
+        voice_loop_enabled=False,
+        _env_file=None,
+    )
+    assert disabled.voice_loop_active is False

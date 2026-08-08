@@ -108,3 +108,13 @@ def test_duplicate_oauth_callback_is_idempotent_when_connected() -> None:
 
     assert response.status_code == 303
     assert response.headers["location"] == "/?mcp=connected"
+
+
+def test_listening_toggle_is_rejected_without_a_device_microphone() -> None:
+    with build_client() as client:
+        state = client.get("/api/state")
+        response = client.post("/api/device/listening", json={"enabled": True})
+
+    assert state.json()["listening_available"] is False
+    assert response.status_code == 409
+    assert response.json()["detail"] == "the device listen loop is unavailable"
