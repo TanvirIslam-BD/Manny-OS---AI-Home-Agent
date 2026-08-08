@@ -44,6 +44,8 @@ class RuntimeSnapshot(BaseModel):
     people_count: int = Field(default=0, ge=0)
     microphone_muted: bool = False
     camera_enabled: bool = True
+    listening_enabled: bool = False
+    listening_available: bool = False
     status_message: str = "Starting Manny"
     sequence: int = Field(default=0, ge=0)
     updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))

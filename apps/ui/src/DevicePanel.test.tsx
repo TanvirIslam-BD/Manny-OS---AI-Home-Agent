@@ -20,6 +20,8 @@ function snapshot(state: RuntimeState): RuntimeSnapshot {
     people_count: 1,
     microphone_muted: false,
     camera_enabled: true,
+    listening_enabled: false,
+    listening_available: false,
     status_message: state,
     sequence: 1,
     updated_at: new Date(0).toISOString(),
@@ -47,5 +49,36 @@ describe('DevicePanel', () => {
 
     expect(screen.getByRole('button', { name: 'Mute microphone' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Disable camera' })).toBeInTheDocument()
+  })
+
+  it('disables the listening control when the device has no microphone loop', () => {
+    render(<DevicePanel view="settings" snapshot={snapshot('IDLE')} mcpConnected busy={false} run={vi.fn()} {...financeProps} />)
+
+    expect(screen.getByRole('button', { name: 'Start always listening' })).toBeDisabled()
+    expect(screen.getByText('Unavailable on this device')).toBeInTheDocument()
+  })
+
+  it('toggles always-on listening when the loop is available', () => {
+    const run = vi.fn().mockResolvedValue(undefined)
+    const listening = { ...snapshot('IDLE'), listening_available: true, listening_enabled: true }
+    render(<DevicePanel view="settings" snapshot={listening} mcpConnected busy={false} run={run} {...financeProps} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Stop always listening' }))
+    expect(run).toHaveBeenCalledOnce()
+  })
+
+  it('shows the configured capture window and presence detector', () => {
+    const settings = {
+      environment: 'raspberrypi',
+      deviceId: 'manny-pi5',
+      hardwareMode: 'real',
+      cameraEnabled: true,
+      voice: { defaultLanguage: 'auto', loopEnabled: true, loopAvailable: true, captureSeconds: 3, vadThreshold: 0.02 },
+      presence: { detector: 'opencv_hog', available: true },
+    }
+    render(<DevicePanel view="settings" snapshot={snapshot('IDLE')} mcpConnected busy={false} run={vi.fn()} settings={settings} {...financeProps} />)
+
+    expect(screen.getByText('3s · speech threshold 0.02')).toBeInTheDocument()
+    expect(screen.getByText('opencv_hog')).toBeInTheDocument()
   })
 })

@@ -81,7 +81,7 @@ class Settings(BaseSettings):
     display_rotation: Literal[0, 90, 180, 270] = 0
     display_scale: float = Field(default=1.0, gt=0, le=4)
 
-    voice_loop_enabled: bool = False
+    voice_loop_enabled: bool = True
     voice_capture_seconds: float = Field(default=3.0, ge=1, le=15)
     voice_vad_threshold: float = Field(default=0.02, gt=0, le=1)
 
@@ -149,11 +149,15 @@ class Settings(BaseSettings):
             raise ValueError("production requires OS keyring token storage")
         if self.hardware_mode == "real" and not self.audio_device:
             raise ValueError("real hardware mode requires MANNY_AUDIO_DEVICE")
-        if self.voice_loop_enabled and self.hardware_mode != "real":
-            raise ValueError("the device voice loop requires real hardware mode")
         if not self.data_directory.is_absolute():
             raise ValueError("MANNY_DATA_DIRECTORY must be an absolute path")
         return self
+
+    @property
+    def voice_loop_active(self) -> bool:
+        """The listen loop is on by default but only runs against a real microphone."""
+
+        return self.voice_loop_enabled and self.hardware_mode == "real"
 
     @property
     def allowed_mcp_tools(self) -> frozenset[str]:
@@ -180,6 +184,14 @@ class Settings(BaseSettings):
                 "defaultLanguage": self.voice_default_language,
                 "majorLanguages": MAJOR_LANGUAGES,
                 "automaticDetection": self.stt_backend == "whisper_cpp",
+                "loopEnabled": self.voice_loop_enabled,
+                "loopAvailable": self.voice_loop_active,
+                "captureSeconds": self.voice_capture_seconds,
+                "vadThreshold": self.voice_vad_threshold,
+            },
+            "presence": {
+                "detector": self.person_detector,
+                "available": self.person_detector != "none",
             },
         }
 

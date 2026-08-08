@@ -30,9 +30,29 @@ export interface RuntimeSnapshot {
   people_count: number
   microphone_muted: boolean
   camera_enabled: boolean
+  listening_enabled: boolean
+  listening_available: boolean
   status_message: string
   sequence: number
   updated_at: string
+}
+
+export interface PublicSettings {
+  environment: string
+  deviceId: string
+  hardwareMode: string
+  cameraEnabled: boolean
+  voice: {
+    defaultLanguage: string
+    loopEnabled: boolean
+    loopAvailable: boolean
+    captureSeconds: number
+    vadThreshold: number
+  }
+  presence: {
+    detector: string
+    available: boolean
+  }
 }
 
 export type MCPConnectionPhase =

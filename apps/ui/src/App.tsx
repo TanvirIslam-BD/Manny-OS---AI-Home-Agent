@@ -11,12 +11,14 @@ import {
   setSimulatorState,
   simulateVoice,
   switchMcpAccount,
+  setListening,
+  getPublicSettings,
 } from './api/client'
 import FinanceDashboard from './components/FinanceDashboard'
 import CameraPresence from './components/CameraPresence'
 import { Icon } from './components/Icons'
 import MannyFace from './components/MannyFace'
-import type { AgentResponse, FinanceDashboardData, MCPStatus, RuntimeSnapshot, RuntimeState } from './types'
+import type { AgentResponse, FinanceDashboardData, MCPStatus, PublicSettings, RuntimeSnapshot, RuntimeState } from './types'
 import { listenOnce, speak, supportsBrowserVoice } from './voice/browser'
 
 const initialState: RuntimeSnapshot = {
@@ -27,6 +29,8 @@ const initialState: RuntimeSnapshot = {
   people_count: 0,
   microphone_muted: false,
   camera_enabled: true,
+  listening_enabled: false,
+  listening_available: false,
   status_message: 'Connecting to Manny Core',
   sequence: 0,
   updated_at: new Date().toISOString(),
@@ -88,6 +92,7 @@ function App() {
   const [financeData, setFinanceData] = useState<FinanceDashboardData | null>(null)
   const [financeLoading, setFinanceLoading] = useState(false)
   const [financeError, setFinanceError] = useState<string | null>(null)
+  const [settings, setSettings] = useState<PublicSettings | null>(null)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -95,6 +100,7 @@ function App() {
       if (!controller.signal.aborted) setError(messageFrom(reason))
     })
     getMcpStatus(controller.signal).then(setMcpStatus).catch(() => undefined)
+    getPublicSettings(controller.signal).then(setSettings).catch(() => undefined)
     const disconnect = connectEvents(
       (event) => {
         if (event.type === 'system.state') setSnapshot(event.payload)
@@ -279,6 +285,7 @@ function App() {
                   }}
                   busy={busy}
                   run={run}
+                  settings={settings}
                 />
 
                 <button
@@ -414,6 +421,7 @@ export function DevicePanel({
   refreshFinance,
   busy,
   run,
+  settings,
 }: {
   view: DeviceView
   snapshot: RuntimeSnapshot
@@ -424,6 +432,7 @@ export function DevicePanel({
   refreshFinance: () => Promise<void>
   busy: boolean
   run: (action: () => Promise<RuntimeSnapshot>) => Promise<void>
+  settings?: PublicSettings | null
 }) {
   if (snapshot.state === 'PAIRING') {
     return <section className="device-panel" aria-label="Pair Manny"><span className="eyebrow">Secure pairing</span><strong>Connect your Money Copilot account</strong><p>Authorize from the setup panel. Manny never displays or stores your password.</p><code>PAIR-MANNY</code></section>
@@ -432,7 +441,42 @@ export function DevicePanel({
     return <section className="device-panel" aria-label="Confirm action"><span className="eyebrow">Confirmation required</span><strong>Create this local reminder?</strong><p>Review your credit card bill Friday at 7:00 PM.</p><div className="device-panel__actions"><button disabled={busy} type="button" onClick={() => void run(() => setSimulatorState('SPEAKING'))}>Confirm</button><button disabled={busy} type="button" onClick={() => void run(() => setSimulatorState('IDLE'))}>Cancel</button></div></section>
   }
   if (view === 'settings') {
-    return <section className="device-panel" aria-label="Manny settings"><span className="eyebrow">Privacy controls</span><strong>Device settings</strong><button disabled={busy} type="button" onClick={() => void run(() => setSimulatorState(snapshot.microphone_muted ? 'IDLE' : 'MIC_MUTED'))}>{snapshot.microphone_muted ? 'Unmute microphone' : 'Mute microphone'}</button><button disabled={busy} type="button" onClick={() => void run(() => setSimulatorState(snapshot.camera_enabled ? 'CAMERA_DISABLED' : 'IDLE'))}>{snapshot.camera_enabled ? 'Disable camera' : 'Enable camera'}</button></section>
+    const voice = settings?.voice
+    const presence = settings?.presence
+    return (
+      <section className="device-panel" aria-label="Manny settings">
+        <span className="eyebrow">Privacy controls</span>
+        <strong>Device settings</strong>
+        <button disabled={busy} type="button" onClick={() => void run(() => setSimulatorState(snapshot.microphone_muted ? 'IDLE' : 'MIC_MUTED'))}>{snapshot.microphone_muted ? 'Unmute microphone' : 'Mute microphone'}</button>
+        <button disabled={busy} type="button" onClick={() => void run(() => setSimulatorState(snapshot.camera_enabled ? 'CAMERA_DISABLED' : 'IDLE'))}>{snapshot.camera_enabled ? 'Disable camera' : 'Enable camera'}</button>
+        <button
+          disabled={busy || !snapshot.listening_available}
+          type="button"
+          title={snapshot.listening_available ? undefined : 'Requires a real microphone'}
+          onClick={() => void run(() => setListening(!snapshot.listening_enabled))}
+        >
+          {snapshot.listening_enabled ? 'Stop always listening' : 'Start always listening'}
+        </button>
+        <dl className="device-settings__facts">
+          <div>
+            <dt>Always listening</dt>
+            <dd>{!snapshot.listening_available ? 'Unavailable on this device' : snapshot.listening_enabled ? 'On' : 'Off'}</dd>
+          </div>
+          {voice && (
+            <div>
+              <dt>Listen window</dt>
+              <dd>{voice.captureSeconds}s · speech threshold {voice.vadThreshold}</dd>
+            </div>
+          )}
+          {presence && (
+            <div>
+              <dt>Presence detection</dt>
+              <dd>{presence.available ? presence.detector : 'Not configured'}</dd>
+            </div>
+          )}
+        </dl>
+      </section>
+    )
   }
   if (view === 'alerts') {
     return <section className="device-panel" aria-label="Money alerts"><span className="eyebrow">Alerts</span><strong>Spending alerts</strong><p>Verified alerts appear here and stay hidden when privacy is locked or multiple people are nearby.</p></section>
