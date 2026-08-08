@@ -305,20 +305,27 @@ class RuleBasedAgent:
         else:
             async with self._conversation_lock:
                 history = list(self._history) if remember else []
+                recalled_text = ""
                 if remember and self._memory is not None:
                     # The recent window is short by design. Without retrieval a
                     # fact stated more turns ago than the window is on disk but
                     # never consulted, and the model answers as if never told.
+                    #
+                    # Recalled rows are scored individually, so injecting them as
+                    # conversation turns can put two user messages in a row, which
+                    # Gemma's chat template rejects outright. They also belong to
+                    # the query rather than the dialogue, so they ride with the
+                    # current message — which keeps the cached system prefix intact.
                     recalled = await self._memory.search(
                         query.text, limit=4, skip_newest=len(history)
                     )
-                    history = [
-                        ConversationMessage(role=item.role, content=item.content)
-                        for item in recalled
-                    ] + history
+                    if recalled:
+                        notes = "\n".join(f"- {item.content}" for item in recalled)
+                        recalled_text = "Earlier in our conversation:\n" + notes + "\n\n"
+                model_text = f"{recalled_text}{query.text}" if recalled_text else query.text
                 try:
                     model_decision = await self._model.decide(
-                        query.text, history, query.language
+                        model_text, history, query.language
                     )
                 except RuntimeError:
                     model_decision = await self._fallback_model.decide(

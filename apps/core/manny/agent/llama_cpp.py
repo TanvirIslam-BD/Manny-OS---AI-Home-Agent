@@ -141,7 +141,7 @@ class LlamaCppAgentModel:
         messages.append({"role": "user", "content": f"{text}{hint}"})
         payload = {
             "model": self._model,
-            "messages": messages,
+            "messages": _alternating(messages),
             "temperature": 0.2,
             "top_p": 0.9,
             # A 1B model will loop a token until the cap is reached, which
@@ -211,7 +211,7 @@ class LlamaCppAgentModel:
             )
         payload = {
             "model": self._model,
-            "messages": messages,
+            "messages": _alternating(messages),
             "temperature": 0.2,
             "top_p": 0.9,
             # A 1B model will loop a token until the cap is reached, which
@@ -242,6 +242,24 @@ class LlamaCppAgentModel:
             raise RuntimeError("Local Gemma is unavailable") from exc
         content = _assistant_content(response.json())
         return AgentDecision.model_validate(json.loads(content))
+
+
+def _alternating(messages: list[dict[str, str]]) -> list[dict[str, str]]:
+    """Merge consecutive same-role turns.
+
+    Gemma's chat template requires strict user/assistant alternation and returns
+    400 for anything else, so a malformed history must not reach it.
+    """
+    merged: list[dict[str, str]] = []
+    for message in messages:
+        if merged and merged[-1]["role"] == message["role"] != "system":
+            merged[-1] = {
+                "role": message["role"],
+                "content": "\n".join([merged[-1]["content"], message["content"]]),
+            }
+            continue
+        merged.append(dict(message))
+    return merged
 
 
 def _assistant_content(payload: Any) -> str:

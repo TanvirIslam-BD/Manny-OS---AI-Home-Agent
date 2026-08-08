@@ -351,3 +351,30 @@ async def test_instruction_prefix_is_stable_as_history_grows() -> None:
 
     assert len(prefixes) == 3
     assert len(set(prefixes)) == 1, "the cached prefix must not change between turns"
+
+
+@pytest.mark.asyncio
+async def test_consecutive_same_role_turns_are_merged() -> None:
+    """Gemma's template rejects anything but strict alternation with a 400."""
+    seen: list[list[dict[str, str]]] = []
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(json.loads(request.content)["messages"])
+        return httpx.Response(
+            200,
+            json={"choices": [{"message": {"content": '{"intent":"general","reply":"ok"}'}}]},
+        )
+
+    history = [
+        ConversationMessage(role="user", content="one"),
+        ConversationMessage(role="user", content="two"),
+        ConversationMessage(role="assistant", content="reply"),
+    ]
+    await model(httpx.MockTransport(handler)).decide("three", history)
+
+    roles = [message["role"] for message in seen[0]]
+    assert roles[0] == "system"
+    conversation = roles[1:]
+    assert all(
+        earlier != later for earlier, later in zip(conversation, conversation[1:], strict=False)
+    ), f"non-alternating roles reached the template: {roles}"
