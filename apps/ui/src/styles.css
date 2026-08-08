@@ -625,3 +625,7 @@ svg { width: 1.3rem; height: 1.3rem; }
 .simulator-shell--kiosk .insights__row, .simulator-shell--kiosk .alerts__list strong { font-size: 2.6vmin; }
 .simulator-shell--kiosk .insights__list em, .simulator-shell--kiosk .alerts__list small { font-size: 2.2vmin; }
 .simulator-shell--kiosk .alerts__add input, .simulator-shell--kiosk .alerts__add select, .simulator-shell--kiosk .alerts__add button { min-height: 8vmin; font-size: 2.4vmin; }
+.card__refresh { min-width: 0; min-height: 0; padding: 2px 6px; color: #6d879c; border: 1px solid rgba(83,169,237,.2); border-radius: 6px; background: transparent; font-size: .47rem; text-transform: uppercase; letter-spacing: .045em; cursor: pointer; }
+.card__refresh:hover:not(:disabled) { color: var(--blue); border-color: rgba(59,157,255,.45); }
+.card__refresh:disabled { cursor: default; opacity: .6; }
+.simulator-shell--kiosk .card__refresh { padding: 1vmin 1.6vmin; font-size: 2vmin; }

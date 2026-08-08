@@ -12,7 +12,7 @@ from manny.voice.interfaces import (
     TextToSpeech,
     VoiceActivityDetector,
 )
-from manny.voice.models import AudioBuffer, VoiceTurnResult
+from manny.voice.models import AudioBuffer, Transcript, VoiceTurnResult
 
 
 class VoiceBusyError(RuntimeError):
@@ -39,7 +39,12 @@ class HalfDuplexVoiceCoordinator:
         self._turn_lock = asyncio.Lock()
 
     async def run_turn(
-        self, audio: AudioBuffer, *, privacy: PrivacyState, authenticated: bool = False
+        self,
+        audio: AudioBuffer,
+        *,
+        privacy: PrivacyState,
+        authenticated: bool = False,
+        transcript: Transcript | None = None,
     ) -> VoiceTurnResult:
         if self._turn_lock.locked():
             raise VoiceBusyError("Manny is already speaking")
@@ -47,7 +52,10 @@ class HalfDuplexVoiceCoordinator:
             if not await self._vad.contains_speech(audio):
                 raise ValueError("No speech detected")
             await self._state.transition(RuntimeState.TRANSCRIBING, force=True)
-            transcript = await self._stt.transcribe(audio)
+            # Wake gating already transcribed this utterance; reuse it rather
+            # than running recognition a second time on the same audio.
+            if transcript is None:
+                transcript = await self._stt.transcribe(audio)
             await self._state.transition(RuntimeState.THINKING, force=True)
             response = await self._agent.answer(
                 AgentQuery(

@@ -19,9 +19,12 @@ from manny.voice.local import (
 from manny.voice.loop import VoiceLoop
 from manny.voice.mock import MockSpeechToText, MockTextToSpeech, MockVoiceActivity, MockWakeWord
 from manny.voice.models import AudioBuffer, Transcript, VoiceTurnResult
+from manny.voice.wake import DEFAULT_PHRASES, PhraseWakeWord
 
 __all__ = [
     "AudioBuffer",
+    "DEFAULT_PHRASES",
+    "PhraseWakeWord",
     "AudioCapture",
     "AudioPlayback",
     "EnergyVoiceActivity",

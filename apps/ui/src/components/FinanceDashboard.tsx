@@ -68,7 +68,18 @@ export default function FinanceDashboard({
         <p>{topCategory ? money(topCategory.amount, currency) : 'No category summary'}</p>
       </article>
       <article className="card card--payment">
-        <header><span>Data source</span><small>{cached ? 'cached' : 'live'}</small></header>
+        <header>
+          <span>Data source</span>
+          <button
+            className="card__refresh"
+            type="button"
+            disabled={loading}
+            aria-label="Refresh money data"
+            onClick={() => void onRefresh()}
+          >
+            {loading ? '…' : cached ? `cached ${syncTime}` : `live ${syncTime}`}
+          </button>
+        </header>
         <strong>Money Copilot</strong>
         <p>{data.budget?.tool_name ?? data.spending?.tool_name ?? 'MCP verified'}</p>
       </article>
@@ -79,12 +90,7 @@ export default function FinanceDashboard({
           <path d="M2 27 18 24 31 28 46 16 58 20 72 8 84 13 98 3" />
         </svg>
       </article>
-      <div className={`sync ${connected && !cached ? '' : 'sync--offline'}`}>
-        {connected && !cached ? <span className="sync__dot" /> : <Icon name="wifiOff" />}
-        {cached ? `Cached MCP data · refreshed ${syncTime}` : `Live MCP data · refreshed ${syncTime}`}
-        <button type="button" disabled={loading} onClick={() => void onRefresh()}>{loading ? 'Refreshing…' : 'Refresh'}</button>
-      </div>
-      {error && <small role="status">Some MCP data could not be refreshed.</small>}
+
     </section>
   )
 }

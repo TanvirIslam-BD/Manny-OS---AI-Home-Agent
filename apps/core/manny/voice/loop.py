@@ -13,11 +13,13 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from datetime import UTC, datetime, timedelta
 
 from manny.state import StateMachine
 from manny.voice.coordinator import HalfDuplexVoiceCoordinator, VoiceBusyError
 from manny.voice.interfaces import AudioCapture
 from manny.voice.models import VoiceTurnResult
+from manny.voice.wake import PhraseWakeWord
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +34,8 @@ class VoiceLoop:
         chunk_seconds: float = 3.0,
         idle_seconds: float = 0.25,
         language: str = "auto",
+        wake_word: PhraseWakeWord | None = None,
+        follow_up_seconds: float = 8.0,
     ) -> None:
         self._microphone = microphone
         self._coordinator = coordinator
@@ -39,6 +43,9 @@ class VoiceLoop:
         self._chunk_seconds = chunk_seconds
         self._idle_seconds = idle_seconds
         self._language = language
+        self._wake_word = wake_word
+        self._follow_up = timedelta(seconds=follow_up_seconds)
+        self._awake_until: datetime | None = None
         self._task: asyncio.Task[None] | None = None
 
     def set_language(self, language: str) -> None:
@@ -65,11 +72,39 @@ class VoiceLoop:
             # Recorders emit raw PCM with no language; carry the configured
             # preference so recognition is not left guessing on a short chunk.
             audio = audio.model_copy(update={"language_hint": self._language})
+
+        transcript = None
+        if self._wake_word is not None:
+            try:
+                transcript = await self._wake_word.transcribe(audio)
+            except RuntimeError:
+                return None
+            spoken = transcript.text.strip()
+            if not spoken:
+                return None
+            if self._wake_word.matches(spoken):
+                # "Hey Manny, how's my budget?" carries the command with it, so
+                # drop the phrase and act on the remainder.
+                transcript = transcript.model_copy(
+                    update={"text": self._wake_word.strip(spoken)}
+                )
+            elif not self._within_follow_up():
+                return None
+
         try:
-            return await self._coordinator.run_turn(audio, privacy=snapshot.privacy)
+            result = await self._coordinator.run_turn(
+                audio, privacy=snapshot.privacy, transcript=transcript
+            )
         except (ValueError, VoiceBusyError):
             # Silence in the chunk, or a turn already running. Both are normal.
             return None
+        # Stay listening briefly so a reply can be followed up without repeating
+        # the wake phrase.
+        self._awake_until = datetime.now(UTC) + self._follow_up
+        return result
+
+    def _within_follow_up(self) -> bool:
+        return self._awake_until is not None and self._awake_until > datetime.now(UTC)
 
     async def _run(self) -> None:
         while True:

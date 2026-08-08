@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
 import FinanceDashboard from './FinanceDashboard'
@@ -32,7 +32,17 @@ describe('FinanceDashboard', () => {
     expect(screen.getByLabelText('Money Copilot finance summary')).toBeInTheDocument()
     expect(screen.getByText(/560\.00/)).toBeInTheDocument()
     expect(screen.getByText('Dining')).toBeInTheDocument()
-    expect(screen.getByText(/Live MCP data/)).toBeInTheDocument()
+    // The freestanding sync bar is gone; live-vs-cached is disclosed on the
+    // data-source card, which doubles as the refresh control.
+    expect(screen.getByRole('button', { name: 'Refresh money data' })).toHaveTextContent(/^live /)
+  })
+
+  it('refreshes from the data source card', async () => {
+    const onRefresh = vi.fn().mockResolvedValue(undefined)
+    render(<FinanceDashboard privacy="PRESENT_TRUSTED" state="DASHBOARD" connected data={liveData} loading={false} error={null} onRefresh={onRefresh} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh money data' }))
+    expect(onRefresh).toHaveBeenCalledOnce()
   })
 
   it('asks for MCP authorization instead of showing demo values while disconnected', () => {

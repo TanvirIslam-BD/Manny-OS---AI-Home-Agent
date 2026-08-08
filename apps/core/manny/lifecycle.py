@@ -30,6 +30,7 @@ from manny.voice import (
     MockTextToSpeech,
     MockVoiceActivity,
     MoonshineSpeechToText,
+    PhraseWakeWord,
     SpeechToText,
     TextToSpeech,
     VoiceActivityDetector,
@@ -315,6 +316,12 @@ def build_services(settings: Settings) -> RuntimeServices:
                 state,
                 chunk_seconds=settings.voice_capture_seconds,
                 language=settings.voice_default_language,
+                wake_word=(
+                    PhraseWakeWord(stt, phrases=settings.wake_phrases)
+                    if settings.wake_word_enabled
+                    else None
+                ),
+                follow_up_seconds=settings.wake_follow_up_seconds,
             )
             if settings.voice_loop_active
             else None

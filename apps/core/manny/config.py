@@ -82,6 +82,9 @@ class Settings(BaseSettings):
     display_scale: float = Field(default=1.0, gt=0, le=4)
 
     voice_loop_enabled: bool = True
+    wake_word_enabled: bool = True
+    wake_word_phrases: str = "hey manny,hi manny,ok manny,hello manny"
+    wake_follow_up_seconds: float = Field(default=8.0, ge=0, le=60)
     voice_capture_seconds: float = Field(default=3.0, ge=1, le=15)
     voice_vad_threshold: float = Field(default=0.02, gt=0, le=1)
 
@@ -154,6 +157,12 @@ class Settings(BaseSettings):
         return self
 
     @property
+    def wake_phrases(self) -> tuple[str, ...]:
+        return tuple(
+            phrase.strip() for phrase in self.wake_word_phrases.split(",") if phrase.strip()
+        )
+
+    @property
     def voice_loop_active(self) -> bool:
         """The listen loop is on by default but only runs against a real microphone."""
 
@@ -185,6 +194,8 @@ class Settings(BaseSettings):
                 "majorLanguages": MAJOR_LANGUAGES,
                 "automaticDetection": self.stt_backend == "whisper_cpp",
                 "loopEnabled": self.voice_loop_enabled,
+                "wakeWordEnabled": self.wake_word_enabled,
+                "wakePhrases": list(self.wake_phrases),
                 "loopAvailable": self.voice_loop_active,
                 "captureSeconds": self.voice_capture_seconds,
                 "vadThreshold": self.voice_vad_threshold,
