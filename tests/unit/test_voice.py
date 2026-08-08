@@ -154,3 +154,14 @@ def test_whisper_language_prefers_an_explicit_choice_over_detection() -> None:
     assert _whisper_language(None, "auto") == "auto"
     assert _whisper_language(None, "") == "auto"
     assert _whisper_language("zh-CN", "auto") == "zh"
+
+
+def test_reply_language_follows_the_answer_not_a_romanized_question() -> None:
+    from manny.agent.runtime import _spoken_language
+
+    # "Amar sathe Bangla kotha bolo" is Latin script and detects as English, but
+    # the reply is Bangla and drives the text-to-speech voice.
+    assert _spoken_language("আমি ভালো আছি", "en") == "bn"
+    # A Latin reply keeps whatever the request resolved to.
+    assert _spoken_language("I'm doing well", "bn-BD") == "bn-BD"
+    assert _spoken_language("I'm doing well", "en") == "en"

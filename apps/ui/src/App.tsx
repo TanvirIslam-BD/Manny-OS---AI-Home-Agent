@@ -224,6 +224,18 @@ function App() {
     }
   }
 
+  // Browser speech recognition cannot auto-detect: it needs one concrete tag.
+  // "Auto detect" is real on the device (whisper.cpp), so here we resolve it to
+  // the language Manny last replied in, then the device default, then the locale.
+  const listeningLanguage =
+    language !== 'auto'
+      ? language
+      : agentResponse?.language && agentResponse.language !== 'en'
+        ? agentResponse.language
+        : settings?.voice.defaultLanguage && settings.voice.defaultLanguage !== 'auto'
+          ? settings.voice.defaultLanguage
+          : navigator.language
+
   async function startVoiceTurn() {
     if (!supportsBrowserVoice()) {
       setError('This browser cannot capture speech. Use the typed question box, or run Manny on the device.')
@@ -233,7 +245,7 @@ function App() {
     setError(null)
     try {
       await pushToTalk()
-      const transcript = await listenOnce(language)
+      const transcript = await listenOnce(listeningLanguage)
       setQuestion(transcript)
       const response = await simulateVoice(
         transcript,
@@ -430,6 +442,11 @@ function App() {
               <label htmlFor="manny-question">Question</label>
               <div><input dir="auto" id="manny-question" value={question} maxLength={500} onChange={(event) => setQuestion(event.target.value)} /><button disabled={busy || !question.trim()} type="submit">Ask</button><button aria-label="Use desktop microphone" disabled={busy || !supportsBrowserVoice()} type="button" onClick={() => void startVoiceTurn()}><Icon name="mic" /></button></div>
             </form>
+            <p className="agent-query__hint">
+              {language === 'auto'
+                ? `Auto detect is on-device only — the browser microphone will listen in ${listeningLanguage}. Pick a language to change it.`
+                : `The microphone will listen in ${listeningLanguage}.`}
+            </p>
             {agentResponse && <div className="agent-answer" role="status"><strong>Manny · {agentResponse.language}</strong><p dir="auto">{agentResponse.answer}</p>{agentResponse.tool_name && <small>Verified via {agentResponse.tool_name}</small>}</div>}
           </section>
 

@@ -275,12 +275,13 @@ class RuleBasedAgent:
                                 ConversationMessage(role="assistant", content=answer),
                             )
                         )
+                    reply_language = normalize_language_tag(
+                        model_decision.language, default=detected_language
+                    )
                     return AgentResponse(
                         answer=answer,
                         intent=model_decision.intent,
-                        language=normalize_language_tag(
-                            model_decision.language, default=detected_language
-                        ),
+                        language=_spoken_language(answer, reply_language),
                     )
         intent = model_decision.intent
         language = normalize_language_tag(
@@ -416,6 +417,17 @@ class RuleBasedAgent:
             tool_name=name,
             data=data,
         )
+
+
+def _spoken_language(answer: str, requested: str) -> str:
+    """Report the language the answer is actually written in.
+
+    A romanized request ("Amar sathe Bangla kotha bolo") is Latin script and
+    detects as English, but the model may answer in Bangla. This tag selects the
+    text-to-speech voice, so it has to describe the answer, not the question.
+    """
+    detected = detect_text_language(answer)
+    return requested if detected == "en" else detected
 
 
 def _money(amount: Decimal, currency: str) -> str:

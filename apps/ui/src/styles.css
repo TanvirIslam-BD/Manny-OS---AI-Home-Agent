@@ -405,6 +405,7 @@ svg { width: 1.3rem; height: 1.3rem; }
 .agent-query input { min-width: 0; min-height: 44px; flex: 1; padding: 0 12px; color: #eaf6ff; border: 1px solid rgba(117,168,204,.18); border-radius: 10px; background: #06111e; }
 .agent-query button { padding: 0 16px; color: #06111d; border: 0; border-radius: 10px; background: linear-gradient(135deg, #62dcff, #26efc4); font-size: .68rem; font-weight: 800; }
 .agent-answer { margin-top: 12px; padding: 12px; border: 1px solid rgba(38,239,196,.18); border-radius: 10px; background: rgba(9,39,36,.3); }
+.agent-query__hint { margin: 8px 0 0; color: #7f97ab; font-size: .66rem; line-height: 1.45; }
 .agent-answer strong { color: var(--teal); font-size: .65rem; }
 .agent-answer p { margin: 4px 0; color: #dbeaf5; font-size: .72rem; line-height: 1.45; }
 .agent-answer small { color: #5e829d; font-size: .55rem; }
