@@ -1,4 +1,4 @@
-import type { AgentResponse, FinanceDashboardData, MannyEvent, MCPStatus, PublicSettings, RuntimeSnapshot, RuntimeState, VoiceResponse } from '../types'
+import type { AgentResponse, FinanceDashboardData, MannyEvent, MCPStatus, MemoryStats, PublicSettings, RuntimeSnapshot, RuntimeState, VoiceResponse } from '../types'
 
 export async function askManny(text: string, language?: string): Promise<AgentResponse> {
   return postJson('/api/agent/query', { text, language })
@@ -39,6 +39,16 @@ export async function setPresence(people_count: number): Promise<RuntimeSnapshot
 
 export async function pushToTalk(): Promise<RuntimeSnapshot> {
   return postJson('/api/interaction/push-to-talk', {})
+}
+
+export async function getMemory(signal?: AbortSignal): Promise<MemoryStats> {
+  const response = await fetch('/api/memory', { signal })
+  if (!response.ok) throw new Error(`Memory request failed: ${response.status}`)
+  return response.json() as Promise<MemoryStats>
+}
+
+export async function clearMemory(): Promise<MemoryStats> {
+  return postJson('/api/memory/clear', {})
 }
 
 export async function cancelInteraction(): Promise<RuntimeSnapshot> {

@@ -12,6 +12,7 @@ from manny.config import Settings
 from manny.hardware import HardwareBundle, LedState, build_mock_hardware, build_real_hardware
 from manny.i18n import normalize_language_tag
 from manny.mcp import MCPConnectionPhase, MCPStatus, MockMCPClient, MoneyCopilotMCPClient
+from manny.memory import MemoryStats, MemoryStore
 from manny.notifications import AlertEngine, Notification, NotificationScheduler
 from manny.observability import MetricsRegistry
 from manny.policy import PolicyEngine
@@ -47,6 +48,7 @@ class RuntimeServices:
     voice: HalfDuplexVoiceCoordinator
     voice_loop: VoiceLoop | None
     finance_cache: FinanceCache
+    memory: MemoryStore
     vision: VisionService
     reminders: ReminderStore
     alerts: AlertEngine
@@ -65,6 +67,8 @@ class RuntimeServices:
         )
         await self.mcp.start()
         await self.finance_cache.initialize()
+        await self.memory.initialize()
+        await self.agent.hydrate()
         await self.reminders.initialize()
         await self.scheduler.start()
         if self.settings.camera_enabled:
@@ -134,9 +138,18 @@ class RuntimeServices:
         )
         await self.events.publish("mcp.status", status.model_dump(mode="json"))
 
+    async def memory_stats(self) -> MemoryStats:
+        return await self.memory.stats()
+
+    async def clear_memory(self) -> MemoryStats:
+        await self.agent.forget()
+        await self.metrics.increment("memory_clears")
+        return await self.memory.stats()
+
     async def factory_reset(self) -> None:
         await self.mcp.reset_credentials()
         await self.finance_cache.clear()
+        await self.agent.forget()
         await self.reminders.clear()
         await self.metrics.increment("device_resets")
         await self.state.transition(
@@ -196,6 +209,7 @@ def build_services(settings: Settings) -> RuntimeServices:
     mcp = MoneyCopilotMCPClient(settings) if settings.mcp_mode == "remote_http" else MockMCPClient()
     state = StateMachine(RuntimeSnapshot(camera_enabled=settings.camera_enabled))
     finance_cache = FinanceCache(settings.data_directory / "finance_cache.sqlite3")
+    memory = MemoryStore(settings.data_directory / "memory.sqlite3")
     reminders = ReminderStore(settings.data_directory / "manny.sqlite3")
     alerts = AlertEngine(
         time.fromisoformat(settings.quiet_hours_start),
@@ -217,6 +231,7 @@ def build_services(settings: Settings) -> RuntimeServices:
         model=model,
         max_context_turns=settings.llm_context_turns,
         timezone=settings.user_timezone,
+        memory=memory,
     )
     stt: SpeechToText
     if settings.stt_backend == "whisper_cpp":
@@ -277,6 +292,7 @@ def build_services(settings: Settings) -> RuntimeServices:
             else None
         ),
         finance_cache=finance_cache,
+        memory=memory,
         vision=VisionService(
             hardware.camera,
             state,

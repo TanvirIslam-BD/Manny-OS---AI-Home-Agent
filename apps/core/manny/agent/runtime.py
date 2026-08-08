@@ -23,6 +23,8 @@ from manny.agent.models import (
     is_non_personal_education,
 )
 from manny.i18n import detect_text_language, finance_template, normalize_language_tag
+from manny.memory import MemoryStore
+from manny.memory.store import entries_from_turn
 from manny.policy import PolicyDecision, PolicyEngine, ToolRequest
 from manny.state import PrivacyState
 from manny.storage import FinanceCache
@@ -221,6 +223,7 @@ class RuleBasedAgent:
         model: IntentModel | None = None,
         max_context_turns: int = 6,
         timezone: str = "UTC",
+        memory: MemoryStore | None = None,
     ) -> None:
         self._broker = broker
         self._remote = remote
@@ -229,6 +232,20 @@ class RuleBasedAgent:
         self._history: deque[ConversationMessage] = deque(maxlen=max_context_turns * 2)
         self._conversation_lock = asyncio.Lock()
         self._timezone: tzinfo = _resolve_timezone(timezone)
+        self._memory = memory
+        self._max_context_messages = max_context_turns * 2
+
+    async def hydrate(self) -> None:
+        """Restore the recent thread so a restart is not a blank slate."""
+        if self._memory is None:
+            return
+        remembered = await self._memory.recent(self._max_context_messages)
+        async with self._conversation_lock:
+            self._history.clear()
+            self._history.extend(
+                ConversationMessage(role=item.role, content=item.content)
+                for item in remembered
+            )
 
     @property
     def model_status(self) -> str:
@@ -238,6 +255,12 @@ class RuleBasedAgent:
         """Discard account-adjacent conversational context during account changes."""
         async with self._conversation_lock:
             self._history.clear()
+
+    async def forget(self) -> None:
+        """Erase durable memory and the live thread together."""
+        if self._memory is not None:
+            await self._memory.clear()
+        await self.clear_context()
 
     async def answer(self, query: AgentQuery, *, privacy: PrivacyState) -> AgentResponse:
         remember = privacy in {PrivacyState.PRIVATE_IDLE, PrivacyState.PRESENT_TRUSTED}
@@ -268,6 +291,9 @@ class RuleBasedAgent:
                     answer = (
                         model_decision.reply.strip() or "I'm here. What would you like to do?"
                     )
+                    reply_language = normalize_language_tag(
+                        model_decision.language, default=detected_language
+                    )
                     if remember:
                         self._history.extend(
                             (
@@ -275,9 +301,12 @@ class RuleBasedAgent:
                                 ConversationMessage(role="assistant", content=answer),
                             )
                         )
-                    reply_language = normalize_language_tag(
-                        model_decision.language, default=detected_language
-                    )
+                        if self._memory is not None:
+                            # General conversation only. Financial results are held by
+                            # the expiring finance cache, never by long-term memory.
+                            await self._memory.remember(
+                                entries_from_turn(query.text, answer, reply_language)
+                            )
                     return AgentResponse(
                         answer=answer,
                         intent=model_decision.intent,

@@ -174,16 +174,26 @@ class LlamaCppAgentModel:
         language_hint: str | None,
         repair: bool,
     ) -> AgentDecision:
-        request_text = f"{SYSTEM_INSTRUCTION}\n\nCurrent user message:\n{text}"
+        # The instruction leads and never varies, so llama.cpp keeps its ~610 tokens
+        # in the prompt cache across turns. Folding it into the trailing user message
+        # instead put it behind the growing history, which changed the prefix every
+        # turn and forced a full re-evaluation of the whole instruction each time.
+        messages: list[dict[str, str]] = [{"role": "system", "content": SYSTEM_INSTRUCTION}]
+        messages.extend(message.model_dump() for message in history)
+        request_text = text
         if language_hint:
             request_text += f"\n\nResponse language hint: {language_hint}"
-        if repair:
-            request_text += (
-                "\n\nYour previous response failed validation. Return only the required JSON "
-                "object with no Markdown or extra keys."
-            )
-        messages = [message.model_dump() for message in history]
         messages.append({"role": "user", "content": request_text})
+        if repair:
+            messages.append(
+                {
+                    "role": "user",
+                    "content": (
+                        "Your previous response failed validation. Return only the required "
+                        "JSON object with no Markdown or extra keys."
+                    ),
+                }
+            )
         payload = {
             "model": self._model,
             "messages": messages,

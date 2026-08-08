@@ -62,6 +62,13 @@ export interface PublicSettings {
   }
 }
 
+export interface MemoryStats {
+  entries: number
+  limit: number
+  oldest: string | null
+  newest: string | null
+}
+
 export type MCPConnectionPhase =
   | 'mock'
   | 'disabled'

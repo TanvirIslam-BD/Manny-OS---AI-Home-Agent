@@ -27,7 +27,11 @@ async def test_llama_cpp_uses_loopback_schema_constrained_completion() -> None:
         assert request.url == "http://127.0.0.1:8080/v1/chat/completions"
         assert payload["model"] == "gemma-3-1b-it"
         assert payload["response_format"]["json_schema"]["strict"] is True
-        assert "never invent" in payload["messages"][-1]["content"]
+        # The instruction must lead as a stable system message so llama.cpp can
+        # keep it in the prompt cache; the user turn stays last.
+        assert payload["messages"][0]["role"] == "system"
+        assert "never invent" in payload["messages"][0]["content"]
+        assert payload["messages"][-1] == {"role": "user", "content": "Hello"}
         return httpx.Response(
             200,
             json={
@@ -323,3 +327,27 @@ async def test_model_generated_finance_numbers_are_rejected_from_template() -> N
 
     assert "999" not in response.answer
     assert response.answer.startswith("You've spent")
+
+
+@pytest.mark.asyncio
+async def test_instruction_prefix_is_stable_as_history_grows() -> None:
+    """A constant leading prefix is what makes the prompt cache usable."""
+    prefixes: list[str] = []
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        payload = json.loads(request.content)
+        prefixes.append(json.dumps(payload["messages"][0]))
+        return httpx.Response(
+            200,
+            json={"choices": [{"message": {"content": '{"intent":"general","reply":"ok"}'}}]},
+        )
+
+    agent = model(httpx.MockTransport(handler))
+    history: list[ConversationMessage] = []
+    for turn in range(3):
+        await agent.decide(f"turn {turn}", list(history))
+        history.append(ConversationMessage(role="user", content=f"turn {turn}"))
+        history.append(ConversationMessage(role="assistant", content="ok"))
+
+    assert len(prefixes) == 3
+    assert len(set(prefixes)) == 1, "the cached prefix must not change between turns"

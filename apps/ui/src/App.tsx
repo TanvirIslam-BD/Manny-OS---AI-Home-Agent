@@ -15,12 +15,14 @@ import {
   setListening,
   setDeviceLanguage,
   getPublicSettings,
+  getMemory,
+  clearMemory,
 } from './api/client'
 import FinanceDashboard from './components/FinanceDashboard'
 import CameraPresence from './components/CameraPresence'
 import { Icon } from './components/Icons'
 import MannyFace from './components/MannyFace'
-import type { AgentResponse, FinanceDashboardData, MCPStatus, PublicSettings, RuntimeSnapshot, RuntimeState } from './types'
+import type { AgentResponse, FinanceDashboardData, MCPStatus, MemoryStats, PublicSettings, RuntimeSnapshot, RuntimeState } from './types'
 import { listenOnce, speak, supportsBrowserVoice } from './voice/browser'
 
 const initialState: RuntimeSnapshot = {
@@ -96,6 +98,7 @@ function App() {
   const [financeError, setFinanceError] = useState<string | null>(null)
   const [settings, setSettings] = useState<PublicSettings | null>(null)
   const [authUrl, setAuthUrl] = useState<string | null>(null)
+  const [memory, setMemory] = useState<MemoryStats | null>(null)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -104,6 +107,7 @@ function App() {
     })
     getMcpStatus(controller.signal).then(setMcpStatus).catch(() => undefined)
     getPublicSettings(controller.signal).then(setSettings).catch(() => undefined)
+    getMemory(controller.signal).then(setMemory).catch(() => undefined)
     const disconnect = connectEvents(
       (event) => {
         if (event.type === 'system.state') setSnapshot(event.payload)
@@ -346,6 +350,15 @@ function App() {
                   settings={settings}
                   mcpStatus={mcpStatus}
                   onConnectMcp={() => void authorizeMoneyCopilot()}
+                  memory={memory}
+                  onClearMemory={async () => {
+                    if (!window.confirm('Clear everything Manny remembers from your conversations? Reminders and settings are kept.')) return
+                    try {
+                      setMemory(await clearMemory())
+                    } catch (reason) {
+                      setError(messageFrom(reason))
+                    }
+                  }}
                 />
 
                 <button
@@ -510,6 +523,8 @@ export function DevicePanel({
   settings,
   mcpStatus,
   onConnectMcp,
+  memory,
+  onClearMemory,
 }: {
   view: DeviceView
   snapshot: RuntimeSnapshot
@@ -523,6 +538,8 @@ export function DevicePanel({
   settings?: PublicSettings | null
   mcpStatus?: MCPStatus
   onConnectMcp?: () => void
+  memory?: MemoryStats | null
+  onClearMemory?: () => Promise<void>
 }) {
   if (snapshot.state === 'PAIRING') {
     return <section className="device-panel" aria-label="Pair Manny"><span className="eyebrow">Secure pairing</span><strong>Connect your Money Copilot account</strong><p>Authorize from the setup panel. Manny never displays or stores your password.</p><code>PAIR-MANNY</code></section>
@@ -571,6 +588,20 @@ export function DevicePanel({
             ))}
           </select>
         </label>
+        {memory && (
+          <button
+            className="device-settings__mcp"
+            disabled={busy || memory.entries === 0}
+            type="button"
+            onClick={() => void onClearMemory?.()}
+          >
+            <span>{memory.entries === 0 ? 'Memory is empty' : 'Clear what Manny remembers'}</span>
+            <small>
+              {memory.entries} of {memory.limit} remembered
+              {memory.entries >= memory.limit ? ' · full, oldest are dropped' : ''}
+            </small>
+          </button>
+        )}
         <dl className="device-settings__facts">
           <div>
             <dt>Always listening</dt>

@@ -13,6 +13,7 @@ from manny.agent import AgentQuery, AgentResponse
 from manny.i18n import LANGUAGE_TAG_PATTERN
 from manny.lifecycle import RuntimeServices
 from manny.mcp import MCPStatus
+from manny.memory import MemoryStats
 from manny.reminders import Reminder, ReminderCreate
 from manny.state import PrivacyState, RuntimeSnapshot, RuntimeState
 from manny.voice import AudioBuffer, VoiceBusyError
@@ -212,6 +213,16 @@ async def set_listening(body: ListeningRequest, services: Services) -> RuntimeSn
 @router.post("/device/language", response_model=RuntimeSnapshot)
 async def set_language(body: LanguageRequest, services: Services) -> RuntimeSnapshot:
     return await services.set_language(body.language)
+
+
+@router.get("/memory", response_model=MemoryStats)
+async def get_memory(services: Services) -> MemoryStats:
+    return await services.memory_stats()
+
+
+@router.post("/memory/clear", response_model=MemoryStats)
+async def clear_memory(services: Services) -> MemoryStats:
+    return await services.clear_memory()
 
 
 @router.post("/device/reset", response_model=RuntimeSnapshot)
