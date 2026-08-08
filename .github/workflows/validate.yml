@@ -35,3 +35,34 @@ jobs:
       - run: npm run typecheck
       - run: npm run test
       - run: npm run build
+
+  audio-loopback:
+    # Exercises the real ALSA adapters against snd-aloop, a kernel loopback sound
+    # card. This is the only automated coverage the capture and playback paths
+    # have; every other audio test runs against mocks. It does not replace a
+    # Raspberry Pi, but it catches device-string and format mistakes that would
+    # otherwise survive until first boot.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Load the ALSA loopback driver
+        id: loopback
+        run: |
+          sudo ./scripts/setup_audio_loopback.sh && echo "available=true" >> "$GITHUB_OUTPUT"             || echo "available=false" >> "$GITHUB_OUTPUT"
+      - name: Report when the driver is unavailable
+        if: steps.loopback.outputs.available != 'true'
+        run: |
+          echo "::warning title=Audio adapters unexercised::snd-aloop did not load, so the ALSA capture and playback tests skipped. The real audio path has no coverage in this run."
+      - run: python -m pip install -e '.[dev]'
+      - name: Exercise the capture and playback adapters
+        run: python -m pytest tests/hardware -v
+      - name: Round trip through verify_hardware.sh
+        if: steps.loopback.outputs.available == 'true'
+        env:
+          MANNY_AUDIO_DEVICE: hw:Loopback,0,0
+        run: |
+          sudo apt-get install -y -qq espeak-ng
+          ./scripts/verify_hardware.sh --quick || true
