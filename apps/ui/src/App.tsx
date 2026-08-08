@@ -251,17 +251,31 @@ function App() {
         <section className="device-stage" aria-label="Manny device display simulator">
           <div className={`device device--${snapshot.state.toLowerCase()}`}>
             <div className="device__halo" />
+            <span className="device__key device__key--left" aria-hidden="true" />
+            <span className="device__key device__key--right" aria-hidden="true" />
             <div className="device__bezel">
               <div className="screen">
+                <span className="screen__camera" aria-hidden="true" />
                 <header className="screen__status">
-                  <div>
+                  <div className="screen__bubble">
                     <span className="eyebrow">{greeting}</span>
                     <strong>{snapshot.status_message}</strong>
                   </div>
-                  <div className="status-icons">
-                    {!snapshot.camera_enabled && <Icon name="eyeOff" />}
-                    {!snapshot.connected && <Icon name="wifiOff" />}
-                    <span className={`privacy-dot privacy-dot--${snapshot.privacy.toLowerCase()}`} title={snapshot.privacy} />
+                  <div className="screen__actions">
+                    <button
+                      className={`mic-orb ${snapshot.state === 'LISTENING' ? 'mic-orb--live' : ''}`}
+                      type="button"
+                      disabled={busy || snapshot.microphone_muted}
+                      aria-label={snapshot.microphone_muted ? 'Microphone muted' : 'Talk to Manny'}
+                      onClick={() => void run(pushToTalk)}
+                    >
+                      <Icon name="mic" />
+                    </button>
+                    <div className="status-icons">
+                      {!snapshot.camera_enabled && <Icon name="eyeOff" />}
+                      {!snapshot.connected && <Icon name="wifiOff" />}
+                      <span className={`privacy-dot privacy-dot--${snapshot.privacy.toLowerCase()}`} title={snapshot.privacy} />
+                    </div>
                   </div>
                 </header>
 
@@ -310,8 +324,9 @@ function App() {
                 </nav>
               </div>
             </div>
-            <div className="device__speaker"><span /><span /><span /><span /><span /><span /><span /></div>
+            <div className="device__badge" aria-hidden="true"><span>M</span></div>
             <div className="device__base-light" />
+            <div className="device__grille" aria-hidden="true" />
           </div>
         </section>
 
