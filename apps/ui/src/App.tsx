@@ -18,13 +18,16 @@ import {
   getMemory,
   clearMemory,
   getSecurity,
+  getReminders,
 } from './api/client'
 import FinanceDashboard from './components/FinanceDashboard'
 import CameraPresence from './components/CameraPresence'
 import { Icon } from './components/Icons'
 import MannyFace from './components/MannyFace'
 import PasscodePanel from './components/PasscodePanel'
-import type { AgentResponse, FinanceDashboardData, MCPStatus, MemoryStats, PublicSettings, SecurityStatus, RuntimeSnapshot, RuntimeState } from './types'
+import InsightsView from './components/InsightsView'
+import AlertsView from './components/AlertsView'
+import type { AgentResponse, FinanceDashboardData, MCPStatus, MemoryStats, PublicSettings, Reminder, SecurityStatus, RuntimeSnapshot, RuntimeState } from './types'
 import { listenOnce, speak, supportsBrowserVoice } from './voice/browser'
 
 const initialState: RuntimeSnapshot = {
@@ -102,6 +105,7 @@ function App() {
   const [authUrl, setAuthUrl] = useState<string | null>(null)
   const [memory, setMemory] = useState<MemoryStats | null>(null)
   const [security, setSecurity] = useState<SecurityStatus | null>(null)
+  const [reminders, setReminders] = useState<Reminder[]>([])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -112,6 +116,7 @@ function App() {
     getPublicSettings(controller.signal).then(setSettings).catch(() => undefined)
     getMemory(controller.signal).then(setMemory).catch(() => undefined)
     getSecurity(controller.signal).then(setSecurity).catch(() => undefined)
+    getReminders(controller.signal).then(setReminders).catch(() => undefined)
     const disconnect = connectEvents(
       (event) => {
         if (event.type === 'system.state') setSnapshot(event.payload)
@@ -356,6 +361,8 @@ function App() {
                   onConnectMcp={() => void authorizeMoneyCopilot()}
                   memory={memory}
                   security={security}
+                  reminders={reminders}
+                  onRemindersChanged={async () => setReminders(await getReminders())}
                   onSecurityChange={async (status) => {
                     setSecurity(status)
                     setSnapshot(await getState())
@@ -536,6 +543,8 @@ export function DevicePanel({
   onClearMemory,
   security,
   onSecurityChange,
+  reminders,
+  onRemindersChanged,
 }: {
   view: DeviceView
   snapshot: RuntimeSnapshot
@@ -553,6 +562,8 @@ export function DevicePanel({
   onClearMemory?: () => Promise<void>
   security?: SecurityStatus | null
   onSecurityChange?: (status: SecurityStatus) => void
+  reminders?: Reminder[]
+  onRemindersChanged?: () => Promise<void>
 }) {
   if (snapshot.state === 'PAIRING') {
     return <section className="device-panel" aria-label="Pair Manny"><span className="eyebrow">Secure pairing</span><strong>Connect your Money Copilot account</strong><p>Authorize from the setup panel. Manny never displays or stores your password.</p><code>PAIR-MANNY</code></section>
@@ -640,7 +651,16 @@ export function DevicePanel({
     )
   }
   if (view === 'alerts') {
-    return <section className="device-panel" aria-label="Money alerts"><span className="eyebrow">Alerts</span><strong>Spending alerts</strong><p>Verified alerts appear here and stay hidden when privacy is locked or multiple people are nearby.</p></section>
+    return (
+      <AlertsView
+        reminders={reminders ?? []}
+        busy={busy}
+        onChanged={onRemindersChanged ?? (async () => undefined)}
+      />
+    )
+  }
+  if (view === 'insights') {
+    return <InsightsView privacy={snapshot.privacy} data={financeData} />
   }
   return <FinanceDashboard privacy={snapshot.privacy} state={snapshot.state} connected={mcpConnected} data={financeData} loading={financeLoading} error={financeError} onRefresh={refreshFinance} />
 }

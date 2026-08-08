@@ -1,4 +1,4 @@
-import type { AgentResponse, FinanceDashboardData, MannyEvent, MCPStatus, MemoryStats, PublicSettings, SecurityStatus, RuntimeSnapshot, RuntimeState, VoiceResponse } from '../types'
+import type { AgentResponse, FinanceDashboardData, MannyEvent, MCPStatus, MemoryStats, PublicSettings, Reminder, SecurityStatus, RuntimeSnapshot, RuntimeState, VoiceResponse } from '../types'
 
 export async function askManny(text: string, language?: string): Promise<AgentResponse> {
   return postJson('/api/agent/query', { text, language })
@@ -39,6 +39,25 @@ export async function setPresence(people_count: number): Promise<RuntimeSnapshot
 
 export async function pushToTalk(): Promise<RuntimeSnapshot> {
   return postJson('/api/interaction/push-to-talk', {})
+}
+
+export async function getReminders(signal?: AbortSignal): Promise<Reminder[]> {
+  const response = await fetch('/api/reminders', { signal })
+  if (!response.ok) throw new Error(`Reminders request failed: ${response.status}`)
+  return response.json() as Promise<Reminder[]>
+}
+
+export async function createReminder(title: string, due_at: string): Promise<Reminder> {
+  return postJson('/api/reminders', { title, due_at })
+}
+
+export async function completeReminder(id: string): Promise<void> {
+  const response = await fetch(`/api/reminders/${id}/complete`, { method: 'POST' })
+  if (!response.ok) throw new Error(`Could not complete the reminder: ${response.status}`)
+}
+
+export async function setBrightness(value: number): Promise<{ brightness: number }> {
+  return postJson('/api/device/brightness', { value })
 }
 
 export async function getSecurity(signal?: AbortSignal): Promise<SecurityStatus> {

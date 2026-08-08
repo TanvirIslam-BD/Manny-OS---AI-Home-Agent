@@ -596,3 +596,32 @@ svg { width: 1.3rem; height: 1.3rem; }
 /* Touch targets stay finger-sized on the panel. */
 .simulator-shell--kiosk button { min-width: 0; }
 .simulator-shell--kiosk .screen__nav button { min-height: 11vmin; }
+
+/* Insights and Alerts: real views replacing the placeholder panels. */
+.insights, .alerts { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 7px; padding: 12px; border: 1px solid rgba(37,196,255,.18); border-radius: 16px; background: rgba(5,18,31,.78); }
+.insights > header, .alerts > header { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.insights > header strong { font: 800 1.05rem/1 Manrope, sans-serif; }
+.alerts > header small { color: #8299ab; font-size: .55rem; }
+.insights__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.insights__list li { display: grid; grid-template-columns: 1fr auto; grid-template-areas: 'row pct' 'bar pct'; gap: 2px 8px; align-items: center; }
+.insights__row { grid-area: row; display: flex; justify-content: space-between; gap: 8px; font-size: .58rem; }
+.insights__row span { color: #dff9ff; text-transform: capitalize; }
+.insights__row small { color: #8fb6d0; }
+.insights__bar { grid-area: bar; height: 4px; border-radius: 4px; background: #08192b; overflow: hidden; }
+.insights__bar span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--blue), #7fc4ff); box-shadow: 0 0 8px var(--blue); }
+.insights__list em { grid-area: pct; color: #6d879c; font-size: .55rem; font-style: normal; }
+.insights__note { margin: 2px 0 0; color: #8299ab; font-size: .52rem; }
+.alerts__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
+.alerts__list li { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 9px; border-radius: 10px; background: rgba(9,24,39,.9); }
+.alerts__list strong { display: block; font-size: .6rem; }
+.alerts__list small { color: #8fb6d0; font-size: .52rem; }
+.alerts__list button { min-width: 28px; min-height: 28px; color: var(--teal); border: 1px solid rgba(38,239,196,.3); border-radius: 8px; background: rgba(38,239,196,.08); cursor: pointer; }
+.alerts__add { display: grid; grid-template-columns: 1fr auto auto; gap: 5px; }
+.alerts__add input, .alerts__add select { min-height: 30px; padding: 5px 8px; color: #dff9ff; border: 1px solid rgba(40,197,255,.3); border-radius: 8px; background: #071c2e; font-size: .56rem; }
+.alerts__add button { min-width: 44px; min-height: 30px; color: #dff9ff; border: 1px solid rgba(40,197,255,.3); border-radius: 8px; background: #0a2942; font-size: .56rem; cursor: pointer; }
+.alerts__message { color: #ffc9d0; font-size: .52rem; }
+.simulator-shell--kiosk .insights, .simulator-shell--kiosk .alerts { padding: 2.6vmin; border-radius: 3.4vmin; gap: 1.6vmin; }
+.simulator-shell--kiosk .insights > header strong { font-size: 5vmin; }
+.simulator-shell--kiosk .insights__row, .simulator-shell--kiosk .alerts__list strong { font-size: 2.6vmin; }
+.simulator-shell--kiosk .insights__list em, .simulator-shell--kiosk .alerts__list small { font-size: 2.2vmin; }
+.simulator-shell--kiosk .alerts__add input, .simulator-shell--kiosk .alerts__add select, .simulator-shell--kiosk .alerts__add button { min-height: 8vmin; font-size: 2.4vmin; }

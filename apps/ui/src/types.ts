@@ -62,6 +62,14 @@ export interface PublicSettings {
   }
 }
 
+export interface Reminder {
+  id: string
+  title: string
+  due_at: string
+  created_at: string
+  completed: boolean
+}
+
 export interface SecurityStatus {
   passcode_set: boolean
   unlocked: boolean

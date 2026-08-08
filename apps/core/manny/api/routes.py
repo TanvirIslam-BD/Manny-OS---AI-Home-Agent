@@ -70,6 +70,10 @@ class PasscodeRequest(BaseModel):
     current_passcode: str | None = Field(default=None, min_length=4, max_length=12)
 
 
+class BrightnessRequest(BaseModel):
+    value: float = Field(ge=0, le=1)
+
+
 class UnlockRequest(BaseModel):
     passcode: str = Field(min_length=4, max_length=12)
 
@@ -226,6 +230,16 @@ async def set_listening(body: ListeningRequest, services: Services) -> RuntimeSn
 @router.post("/device/language", response_model=RuntimeSnapshot)
 async def set_language(body: LanguageRequest, services: Services) -> RuntimeSnapshot:
     return await services.set_language(body.language)
+
+
+@router.post("/device/brightness")
+async def set_brightness(body: BrightnessRequest, services: Services) -> dict[str, float]:
+    """Drive the display adapter, which until now had no caller."""
+    try:
+        await services.hardware.display.set_brightness(body.value)
+    except OSError as exc:
+        raise HTTPException(status_code=503, detail="the display is not adjustable") from exc
+    return {"brightness": body.value}
 
 
 @router.get("/security", response_model=SecurityStatus)

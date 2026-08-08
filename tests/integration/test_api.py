@@ -1,3 +1,4 @@
+import pytest
 from fastapi.testclient import TestClient
 
 from manny.config import Settings
@@ -170,3 +171,18 @@ def test_passcode_unlock_opens_the_gate_and_locking_closes_it() -> None:
     assert allowed.json()["requires_authentication"] is False
     assert "spent" in allowed.json()["answer"].casefold()
     assert relocked.json()["requires_authentication"] is True
+
+
+def test_brightness_reaches_the_display_adapter() -> None:
+    app = create_app(
+        Settings(environment="test", config_profile="development", mcp_mode="mock", _env_file=None)
+    )
+    with TestClient(app) as client:
+        response = client.post("/api/device/brightness", json={"value": 0.4})
+        rejected = client.post("/api/device/brightness", json={"value": 2})
+        display = app.state.services.hardware.display
+
+    assert response.status_code == 200
+    assert rejected.status_code == 422
+    # The adapter had no caller before; assert the value actually lands on it.
+    assert display.brightness == pytest.approx(0.4)
