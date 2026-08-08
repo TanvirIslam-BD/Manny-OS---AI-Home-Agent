@@ -98,12 +98,11 @@ svg { width: 1.3rem; height: 1.3rem; }
 .device {
   --state: var(--blue);
   width: min(520px, 80vw);
-  aspect-ratio: .8;
   position: relative;
   display: flex;
   align-items: center;
   flex-direction: column;
-  padding-top: 34px;
+  padding: 30px 0 20%;
   border-radius: 21% 21% 30% 30% / 16% 16% 21% 21%;
   background:
     linear-gradient(120deg, rgba(255,255,255,.97), rgba(232,236,240,.94) 52%, rgba(252,253,254,.97)),
@@ -117,8 +116,8 @@ svg { width: 1.3rem; height: 1.3rem; }
 .device::after {
   content: '';
   position: absolute;
-  left: -7%; right: -7%; bottom: -7%;
-  height: 43%;
+  left: 2%; right: 2%; bottom: 0;
+  height: 34%;
   z-index: -1;
   border-radius: 14% 14% 42% 42% / 24% 24% 58% 58%;
   background:
@@ -158,8 +157,8 @@ svg { width: 1.3rem; height: 1.3rem; }
   transition: background .35s, box-shadow .35s;
 }
 .device__bezel {
-  width: 84%;
-  height: 76%;
+  width: 86%;
+  aspect-ratio: var(--display-ratio, 1);
   padding: 9px;
   border-radius: 15% 15% 13% 13% / 11% 11% 10% 10%;
   background: linear-gradient(145deg, #060a10, #15202b 45%, #000307);
@@ -172,7 +171,8 @@ svg { width: 1.3rem; height: 1.3rem; }
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  padding: 20px 18px 10px;
+  gap: 6px;
+  padding: 18px 16px 8px;
   border-radius: 13% 13% 11% 11% / 10% 10% 9% 9%;
   background:
     radial-gradient(circle at 50% 18%, color-mix(in srgb, var(--state) 9%, transparent), transparent 33%),
@@ -213,7 +213,7 @@ svg { width: 1.3rem; height: 1.3rem; }
 .privacy-dot--present_unknown, .privacy-dot--multiple_people { background: var(--amber); box-shadow: 0 0 10px var(--amber); }
 .privacy-dot--privacy_locked { background: var(--red); box-shadow: 0 0 10px var(--red); }
 
-.face { width: 100%; min-height: 118px; position: relative; flex: 0 0 29%; margin-top: -2px; }
+.face { width: 100%; min-height: 74px; position: relative; flex: 0 1 22%; margin-top: -2px; }
 .face__ambient { position: absolute; width: 55%; height: 70%; top: 11%; left: 22.5%; border-radius: 50%; background: radial-gradient(circle, color-mix(in srgb, var(--state) 8%, transparent), transparent 68%); filter: blur(3px); }
 .eye {
   position: absolute;
@@ -253,7 +253,7 @@ svg { width: 1.3rem; height: 1.3rem; }
 .face--speaking .mouth { height: clamp(22px, 4.4vw, 32px); }
 .face--speaking .mouth span { border-top: clamp(4px, .6vw, 6px) solid var(--state); border-radius: 50%; background: color-mix(in srgb, var(--state) 16%, transparent); animation: speak .45s ease-in-out infinite alternate; }
 
-.cards { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; position: relative; z-index: 2; }
+.cards { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: grid; grid-template-columns: 1fr 1fr; gap: 7px; align-content: start; position: relative; z-index: 2; }
 .card {
   min-height: 72px;
   padding: 11px 12px;
@@ -299,7 +299,7 @@ svg { width: 1.3rem; height: 1.3rem; }
 .privacy-card strong { display: block; margin-top: 4px; font: 700 .82rem/1.2 Manrope, sans-serif; }
 .privacy-card p { margin: 5px 0 0; color: #8fa1ae; font-size: .58rem; line-height: 1.4; }
 
-.ask-button {
+.ask-button { flex: 0 0 auto;
   position: absolute;
   z-index: 5;
   left: 50%; bottom: 58px;
@@ -326,8 +326,9 @@ svg { width: 1.3rem; height: 1.3rem; }
 .ask-button--listening { border-color: var(--cyan); animation: buttonPulse 1.2s ease-in-out infinite; }
 
 .screen__nav {
+  flex: 0 0 auto;
   height: 49px;
-  margin: auto -8px 0;
+  margin: 0 -8px 0;
   padding: 8px 3px 0;
   display: grid;
   grid-template-columns: repeat(5, 1fr);
@@ -407,10 +408,28 @@ svg { width: 1.3rem; height: 1.3rem; }
 .agent-answer p { margin: 4px 0; color: #dbeaf5; font-size: .72rem; line-height: 1.45; }
 .agent-answer small { color: #5e829d; font-size: .55rem; }
 
-.device-panel { min-height: 154px; padding: 18px; display: flex; flex-direction: column; justify-content: center; gap: 7px; border: 1px solid rgba(37,196,255,.18); border-radius: 16px; background: rgba(5,18,31,.78); }
+.device-panel { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 14px; display: flex; flex-direction: column; justify-content: center; gap: 7px; border: 1px solid rgba(37,196,255,.18); border-radius: 16px; background: rgba(5,18,31,.78); }
 .device-panel strong { font: 700 .82rem/1.25 Manrope, sans-serif; }
 .device-panel p { margin: 0; color: #8299ab; font-size: .58rem; line-height: 1.45; }
 .device-panel code { align-self: flex-start; margin-top: 4px; padding: 6px 9px; color: var(--teal); border-radius: 7px; background: rgba(38,239,196,.08); font-size: .62rem; letter-spacing: .08em; }
+.device-settings__mcp { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; text-align: left; }
+.device-settings__mcp small { color: #8299ab; font-size: .5rem; font-weight: 400; }
+.webview {
+  position: absolute;
+  inset: 0;
+  z-index: 12;
+  display: flex;
+  flex-direction: column;
+  background: #050c15;
+}
+.webview header { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; color: #cfe6ff; font-size: .6rem; border-bottom: 1px solid rgba(104,163,205,.16); }
+.webview header button { min-width: 28px; min-height: 28px; color: #cfe6ff; border: 0; border-radius: 8px; background: rgba(255,255,255,.06); cursor: pointer; }
+.webview iframe { flex: 1 1 auto; width: 100%; border: 0; background: #fff; }
+.webview footer { padding: 6px 10px; color: #7f97ab; font-size: .5rem; text-align: center; }
+.webview footer a { color: var(--blue); }
+.simulator-shell--kiosk .webview header { font-size: 2.6vmin; padding: 2vmin; }
+.simulator-shell--kiosk .webview footer { font-size: 2.2vmin; }
+
 .device-settings__language { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .device-settings__language > span { color: #8299ab; font-size: .55rem; letter-spacing: .06em; text-transform: uppercase; }
 .device-settings__language select { min-height: 30px; padding: 4px 8px; color: #dff9ff; border: 1px solid rgba(40,197,255,.3); border-radius: 8px; background: #0a2942; font-size: .58rem; cursor: pointer; }
@@ -450,7 +469,7 @@ svg { width: 1.3rem; height: 1.3rem; }
   .face { min-height: 100px; }
   .card { min-height: 65px; padding: 8px; }
   .card header small { display: none; }
-  .ask-button { bottom: 50px; }
+  .ask-button { flex: 0 0 auto; bottom: 50px; }
   .screen__nav { height: 43px; }
   .controls__heading h1 { font-size: 2.55rem; }
   .state-grid { grid-template-columns: repeat(2, 1fr); }
@@ -459,3 +478,88 @@ svg { width: 1.3rem; height: 1.3rem; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; }
 }
+
+
+/* ---------------------------------------------------------------------------
+   Kiosk mode — the physical Raspberry Pi panel.
+
+   The app is the whole screen there: no chassis, no developer controls, and no
+   browser chrome. Type and spacing switch to vmin so the layout holds on a small
+   square panel (480x480 by default) instead of collapsing at desktop vw sizes.
+   --------------------------------------------------------------------------- */
+.simulator-shell--kiosk { min-height: 100vh; }
+.simulator-shell--kiosk::before { display: none; }
+.simulator-shell--kiosk .brandbar,
+.simulator-shell--kiosk .controls,
+.simulator-shell--kiosk .device__key,
+.simulator-shell--kiosk .device__halo,
+.simulator-shell--kiosk .device__badge,
+.simulator-shell--kiosk .device__base-light,
+.simulator-shell--kiosk .device__grille { display: none; }
+
+.simulator-shell--kiosk .workspace {
+  width: 100%;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+  display: block;
+  gap: 0;
+}
+.simulator-shell--kiosk .device-stage { height: 100vh; perspective: none; }
+.simulator-shell--kiosk .device {
+  width: 100vw;
+  height: 100vh;
+  aspect-ratio: auto;
+  padding: 0;
+  border-radius: 0;
+  background: #000;
+  box-shadow: none;
+}
+.simulator-shell--kiosk .device::after { display: none; }
+.simulator-shell--kiosk .device__bezel {
+  width: 100%;
+  height: 100%;
+  aspect-ratio: auto;
+  padding: 0;
+  border-radius: 0;
+  background: #000;
+  box-shadow: none;
+}
+.simulator-shell--kiosk .screen {
+  border: 0;
+  border-radius: 0;
+  padding: 3.2vmin 3.4vmin 1.6vmin;
+}
+.simulator-shell--kiosk .screen__camera { display: none; }
+.simulator-shell--kiosk .screen__bubble { padding: 2vmin 2.6vmin; border-radius: 3.2vmin; }
+.simulator-shell--kiosk .eyebrow { font-size: 2.5vmin; }
+.simulator-shell--kiosk .screen__bubble strong { font-size: 3.6vmin; }
+.simulator-shell--kiosk .mic-orb { width: 9.5vmin; height: 9.5vmin; min-width: 9.5vmin; }
+.simulator-shell--kiosk .mic-orb svg { width: 4.2vmin; height: 4.2vmin; }
+.simulator-shell--kiosk .face { min-height: 24vmin; }
+.simulator-shell--kiosk .eye { width: 13vmin; height: 7vmin; border-width: 1.2vmin; }
+.simulator-shell--kiosk .mouth { width: 10vmin; height: 5vmin; }
+.simulator-shell--kiosk .mouth span { border-width: 1.2vmin; }
+.simulator-shell--kiosk .cards { gap: 1.6vmin; }
+.simulator-shell--kiosk .card { min-height: 15vmin; padding: 2.2vmin 2.4vmin; border-radius: 3vmin; }
+.simulator-shell--kiosk .card header { font-size: 2.3vmin; }
+.simulator-shell--kiosk .card header small { font-size: 2vmin; }
+.simulator-shell--kiosk .card strong { font-size: 5vmin; }
+.simulator-shell--kiosk .card p { font-size: 2.3vmin; }
+.simulator-shell--kiosk .sync { font-size: 2.1vmin; }
+.simulator-shell--kiosk .device-panel { padding: 2.4vmin; border-radius: 3.4vmin; }
+.simulator-shell--kiosk .device-panel strong { font-size: 3.4vmin; }
+.simulator-shell--kiosk .device-panel p { font-size: 2.4vmin; }
+.simulator-shell--kiosk .device-panel > button { min-height: 8vmin; font-size: 2.4vmin; border-radius: 2.4vmin; }
+.simulator-shell--kiosk .device-settings__language select { min-height: 7.5vmin; font-size: 2.4vmin; }
+.simulator-shell--kiosk .device-settings__facts dt,
+.simulator-shell--kiosk .device-settings__facts dd { font-size: 2.3vmin; }
+.simulator-shell--kiosk .ask-button { flex: 0 0 auto; min-height: 9vmin; font-size: 2.6vmin; }
+.simulator-shell--kiosk .screen__nav { height: 12vmin; }
+.simulator-shell--kiosk .screen__nav button { font-size: 2vmin; }
+.simulator-shell--kiosk .screen__nav svg { width: 4vmin; height: 4vmin; }
+.simulator-shell--kiosk .screen__nav .nav-orb { width: 10vmin; height: 10vmin; }
+
+/* Touch targets stay finger-sized on the panel. */
+.simulator-shell--kiosk button { min-width: 0; }
+.simulator-shell--kiosk .screen__nav button { min-height: 11vmin; }

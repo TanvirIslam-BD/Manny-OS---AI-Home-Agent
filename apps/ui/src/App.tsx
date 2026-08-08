@@ -94,6 +94,7 @@ function App() {
   const [financeLoading, setFinanceLoading] = useState(false)
   const [financeError, setFinanceError] = useState<string | null>(null)
   const [settings, setSettings] = useState<PublicSettings | null>(null)
+  const [authUrl, setAuthUrl] = useState<string | null>(null)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -130,6 +131,23 @@ function App() {
   }, [mcpStatus.connected])
 
   const language = snapshot.language
+  // A successful callback flips the status, which retires the webview on its own.
+  const pendingAuthUrl = mcpStatus.connected ? null : authUrl
+
+  // On the Pi the app *is* the panel, so the simulated chassis is dropped and the
+  // screen fills the viewport. The device geometry drives the screen-to-body ratio
+  // in both modes, so the simulator matches the panel that ships.
+  const kiosk = useMemo(() => {
+    const forced = new URLSearchParams(window.location.search).get('kiosk')
+    if (forced !== null) return forced !== '0'
+    return settings?.environment === 'raspberrypi' || settings?.environment === 'production'
+  }, [settings?.environment])
+
+  const displayRatio = useMemo(() => {
+    const width = settings?.display.width ?? 480
+    const height = settings?.display.height ?? 480
+    return width > 0 && height > 0 ? width / height : 1
+  }, [settings?.display.width, settings?.display.height])
 
   const greeting = useMemo(() => {
     if (snapshot.state === 'OFFLINE') return 'Connection paused'
@@ -157,7 +175,9 @@ function App() {
     try {
       const status = await connectMcp()
       setMcpStatus(status)
-      if (status.authorization_url) window.location.assign(status.authorization_url)
+      // The device has no browser to hand off to, so authorization happens in an
+      // embedded webview on the panel itself.
+      if (status.authorization_url) setAuthUrl(status.authorization_url)
     } catch (reason) {
       setError(messageFrom(reason))
     } finally {
@@ -178,7 +198,7 @@ function App() {
       setAgentResponse(null)
       const status = await switchMcpAccount()
       setMcpStatus(status)
-      if (status.authorization_url) window.location.assign(status.authorization_url)
+      if (status.authorization_url) setAuthUrl(status.authorization_url)
     } catch (reason) {
       setError(messageFrom(reason))
     } finally {
@@ -232,7 +252,10 @@ function App() {
   }
 
   return (
-    <main className="simulator-shell">
+    <main
+      className={`simulator-shell ${kiosk ? 'simulator-shell--kiosk' : ''}`}
+      style={{ ["--display-ratio" as string]: `${displayRatio}` }}
+    >
       <header className="brandbar">
         <div className="brandmark" aria-hidden="true"><span>M</span></div>
         <div>
@@ -303,6 +326,8 @@ function App() {
                   busy={busy}
                   run={run}
                   settings={settings}
+                  mcpStatus={mcpStatus}
+                  onConnectMcp={() => void authorizeMoneyCopilot()}
                 />
 
                 <button
@@ -314,6 +339,19 @@ function App() {
                   <Icon name="mic" />
                   <span>{snapshot.microphone_muted ? 'Microphone muted' : snapshot.state === 'LISTENING' ? 'Listening…' : 'Ask Manny'}</span>
                 </button>
+
+                {pendingAuthUrl && (
+                  <div className="webview" role="dialog" aria-label="Authorize Money Copilot">
+                    <header>
+                      <span>Money Copilot sign-in</span>
+                      <button type="button" onClick={() => setAuthUrl(null)} aria-label="Close sign-in">✕</button>
+                    </header>
+                    <iframe title="Money Copilot authorization" src={pendingAuthUrl} />
+                    <footer>
+                      If the provider blocks embedding, <a href={pendingAuthUrl} rel="noreferrer">open it in a browser</a>.
+                    </footer>
+                  </div>
+                )}
 
                 <nav className="screen__nav" aria-label="Device navigation">
                   <button className={deviceView === 'home' ? 'is-active' : ''} aria-pressed={deviceView === 'home'} type="button" onClick={() => setDeviceView('home')}><Icon name="home" /><span>Home</span></button>
@@ -440,6 +478,8 @@ export function DevicePanel({
   busy,
   run,
   settings,
+  mcpStatus,
+  onConnectMcp,
 }: {
   view: DeviceView
   snapshot: RuntimeSnapshot
@@ -451,6 +491,8 @@ export function DevicePanel({
   busy: boolean
   run: (action: () => Promise<RuntimeSnapshot>) => Promise<void>
   settings?: PublicSettings | null
+  mcpStatus?: MCPStatus
+  onConnectMcp?: () => void
 }) {
   if (snapshot.state === 'PAIRING') {
     return <section className="device-panel" aria-label="Pair Manny"><span className="eyebrow">Secure pairing</span><strong>Connect your Money Copilot account</strong><p>Authorize from the setup panel. Manny never displays or stores your password.</p><code>PAIR-MANNY</code></section>
@@ -475,6 +517,17 @@ export function DevicePanel({
         >
           {snapshot.listening_enabled ? 'Stop always listening' : 'Start always listening'}
         </button>
+        {mcpStatus && (
+          <button
+            className="device-settings__mcp"
+            disabled={busy || mcpStatus.phase === 'mock'}
+            type="button"
+            onClick={() => onConnectMcp?.()}
+          >
+            <span>{mcpStatus.connected ? 'Reconnect Money Copilot' : 'Connect Money Copilot'}</span>
+            <small>{mcpStatus.detail}</small>
+          </button>
+        )}
         <label className="device-settings__language">
           <span>Language</span>
           <select

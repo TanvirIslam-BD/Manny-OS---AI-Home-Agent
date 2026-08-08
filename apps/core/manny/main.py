@@ -54,7 +54,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         response.headers["Referrer-Policy"] = "no-referrer"
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; connect-src 'self' ws: wss:; img-src 'self' data:; "
-            "style-src 'self' 'unsafe-inline'; script-src 'self'"
+            "style-src 'self' 'unsafe-inline'; script-src 'self'; "
+            # The device has no external browser, so OAuth sign-in renders in an
+            # embedded webview. Framing is limited to HTTPS provider pages.
+            "frame-src https:"
         )
         response.headers["Cache-Control"] = "no-store"
         return response

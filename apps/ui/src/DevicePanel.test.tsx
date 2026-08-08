@@ -74,6 +74,7 @@ describe('DevicePanel', () => {
       deviceId: 'manny-pi5',
       hardwareMode: 'real',
       cameraEnabled: true,
+      display: { width: 480, height: 480, rotation: 0, scale: 1 },
       voice: { defaultLanguage: 'auto', loopEnabled: true, loopAvailable: true, captureSeconds: 3, vadThreshold: 0.02 },
       presence: { detector: 'opencv_hog', available: true },
     }

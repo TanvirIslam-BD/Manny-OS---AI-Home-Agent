@@ -42,6 +42,12 @@ export interface PublicSettings {
   environment: string
   deviceId: string
   hardwareMode: string
+  display: {
+    width: number | null
+    height: number | null
+    rotation: number
+    scale: number
+  }
   cameraEnabled: boolean
   voice: {
     defaultLanguage: string
