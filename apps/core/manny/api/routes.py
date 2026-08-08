@@ -55,6 +55,14 @@ class ListeningRequest(BaseModel):
     enabled: bool
 
 
+class LanguageRequest(BaseModel):
+    language: str = Field(
+        min_length=2,
+        max_length=35,
+        pattern=rf"^(?:auto|{LANGUAGE_TAG_PATTERN.pattern[1:-1]})$",
+    )
+
+
 class DeviceResetRequest(BaseModel):
     confirmation: Literal["RESET MANNY"]
 
@@ -199,6 +207,11 @@ async def set_listening(body: ListeningRequest, services: Services) -> RuntimeSn
     if not services.state.snapshot.listening_available:
         raise HTTPException(status_code=409, detail="the device listen loop is unavailable")
     return await services.set_listening(body.enabled)
+
+
+@router.post("/device/language", response_model=RuntimeSnapshot)
+async def set_language(body: LanguageRequest, services: Services) -> RuntimeSnapshot:
+    return await services.set_language(body.language)
 
 
 @router.post("/device/reset", response_model=RuntimeSnapshot)

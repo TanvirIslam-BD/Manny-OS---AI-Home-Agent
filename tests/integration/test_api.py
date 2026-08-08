@@ -118,3 +118,17 @@ def test_listening_toggle_is_rejected_without_a_device_microphone() -> None:
     assert state.json()["listening_available"] is False
     assert response.status_code == 409
     assert response.json()["detail"] == "the device listen loop is unavailable"
+
+
+def test_device_language_is_applied_and_broadcast() -> None:
+    with build_client() as client:
+        response = client.post("/api/device/language", json={"language": "bn-BD"})
+        current = client.get("/api/state")
+        auto = client.post("/api/device/language", json={"language": "auto"})
+        rejected = client.post("/api/device/language", json={"language": "not a tag!"})
+
+    assert response.status_code == 200
+    assert response.json()["language"] == "bn-BD"
+    assert current.json()["language"] == "bn-BD"
+    assert auto.json()["language"] == "auto"
+    assert rejected.status_code == 422

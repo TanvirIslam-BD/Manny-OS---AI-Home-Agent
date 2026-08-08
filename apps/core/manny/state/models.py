@@ -46,6 +46,7 @@ class RuntimeSnapshot(BaseModel):
     camera_enabled: bool = True
     listening_enabled: bool = False
     listening_available: bool = False
+    language: str = Field(default="auto", min_length=2, max_length=35)
     status_message: str = "Starting Manny"
     sequence: int = Field(default=0, ge=0)
     updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))

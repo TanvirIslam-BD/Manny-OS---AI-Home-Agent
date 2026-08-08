@@ -10,6 +10,7 @@ from manny.agent import LlamaCppAgentModel, RuleBasedAgent, ToolBroker
 from manny.api.events import EventBus
 from manny.config import Settings
 from manny.hardware import HardwareBundle, LedState, build_mock_hardware, build_real_hardware
+from manny.i18n import normalize_language_tag
 from manny.mcp import MCPConnectionPhase, MCPStatus, MockMCPClient, MoneyCopilotMCPClient
 from manny.notifications import AlertEngine, Notification, NotificationScheduler
 from manny.observability import MetricsRegistry
@@ -76,6 +77,20 @@ class RuntimeServices:
             message=self.state.snapshot.status_message,
             listening_enabled=self.voice_loop is not None,
             listening_available=self.voice_loop is not None,
+            language=self.settings.voice_default_language,
+        )
+
+    async def set_language(self, language: str) -> RuntimeSnapshot:
+        """Change the spoken/recognition language for the whole device."""
+
+        resolved = "auto" if language.casefold() == "auto" else normalize_language_tag(language)
+        if self.voice_loop is not None:
+            self.voice_loop.set_language(resolved)
+        return await self.state.transition(
+            self.state.snapshot.state,
+            force=True,
+            message=self.state.snapshot.status_message,
+            language=resolved,
         )
 
     async def set_listening(self, enabled: bool) -> RuntimeSnapshot:
