@@ -57,10 +57,12 @@ class RuntimeServices:
     alerts: AlertEngine
     scheduler: NotificationScheduler
     metrics: MetricsRegistry
+    camera_active: bool = True
 
     async def start(self) -> None:
         self.state.subscribe(self._on_state_change)
         await self.hardware.led.set_state(LedState.BOOTING)
+        self.camera_active = self.settings.camera_enabled
         if self.settings.camera_enabled:
             await self.hardware.camera.start()
         await self.state.transition(
@@ -125,6 +127,15 @@ class RuntimeServices:
         await self.hardware.camera.stop()
 
     async def _on_state_change(self, snapshot: RuntimeSnapshot) -> None:
+        # Disabling the camera previously flipped a flag and left the adapter
+        # running, so the lens stayed open. Enforce it at the hardware boundary:
+        # a stopped camera cannot hand a frame to anything, whatever asks.
+        if snapshot.camera_enabled != self.camera_active:
+            if snapshot.camera_enabled:
+                await self.hardware.camera.start()
+            else:
+                await self.hardware.camera.stop()
+            self.camera_active = snapshot.camera_enabled
         await self.hardware.led.set_state(_led_for_state(snapshot.state))
         await self.events.publish("system.state", snapshot.model_dump(mode="json"))
 

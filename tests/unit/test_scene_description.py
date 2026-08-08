@@ -94,3 +94,27 @@ async def test_a_stopped_camera_reports_no_picture(tmp_path: Path) -> None:
     )
 
     assert "picture" in response.answer.casefold()
+
+
+async def test_disabling_the_camera_stops_the_lens_not_just_a_flag() -> None:
+    """The privacy switch must reach the hardware, not only the snapshot."""
+    from manny.config import Settings
+    from manny.lifecycle import build_services
+    from manny.state import RuntimeState
+
+    services = build_services(
+        Settings(environment="test", mcp_mode="mock", _env_file=None)
+    )
+    await services.start()
+    try:
+        assert services.hardware.camera.running is True  # type: ignore[attr-defined]
+        assert await services.hardware.camera.capture_frame() is not None
+
+        await services.state.transition(
+            RuntimeState.CAMERA_DISABLED, force=True, camera_enabled=False
+        )
+
+        assert services.hardware.camera.running is False  # type: ignore[attr-defined]
+        assert await services.hardware.camera.capture_frame() is None
+    finally:
+        await services.stop()
