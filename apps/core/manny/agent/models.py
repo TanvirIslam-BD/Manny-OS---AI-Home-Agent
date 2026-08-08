@@ -60,6 +60,7 @@ class AgentQuery(BaseModel):
 
 
 AgentIntent = Literal[
+    "create_reminder",
     "budget_status",
     "category_spending",
     "recurring_payments",

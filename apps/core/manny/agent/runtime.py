@@ -26,6 +26,8 @@ from manny.i18n import detect_text_language, finance_template, normalize_languag
 from manny.memory import MemoryStore
 from manny.memory.store import entries_from_turn
 from manny.policy import PolicyDecision, PolicyEngine, ToolRequest
+from manny.reminders import ReminderCreate, ReminderStore
+from manny.reminders.parsing import parse_due, parse_title
 from manny.state import PrivacyState
 from manny.storage import FinanceCache
 
@@ -58,6 +60,15 @@ class DeterministicIntentModel:
         value = text.casefold()
         if is_non_personal_education(text):
             return "general"
+        if any(
+            keyword in value
+            for keyword in (
+                "remind", "reminder", "রিমাইন্ডার", "মনে করিয়ে", "याद दिला", "रिमाइंडर",
+                "提醒", "リマインド", "recuérdame", "recordarme", "rappelle-moi",
+                "erinnere mich", "ذكرني", "напомни", "알려줘", "리마인더",
+            )
+        ):
+            return "create_reminder"
         if any(
             keyword in value
             for keyword in (
@@ -224,6 +235,7 @@ class RuleBasedAgent:
         max_context_turns: int = 6,
         timezone: str = "UTC",
         memory: MemoryStore | None = None,
+        reminders: ReminderStore | None = None,
     ) -> None:
         self._broker = broker
         self._remote = remote
@@ -233,6 +245,7 @@ class RuleBasedAgent:
         self._conversation_lock = asyncio.Lock()
         self._timezone: tzinfo = _resolve_timezone(timezone)
         self._memory = memory
+        self._reminders = reminders
         self._max_context_messages = max_context_turns * 2
 
     async def hydrate(self) -> None:
@@ -327,6 +340,8 @@ class RuleBasedAgent:
         language = normalize_language_tag(
             model_decision.language, default=detected_language
         )
+        if intent == "create_reminder":
+            return await self._create_reminder(query.text, language)
         if self._remote and intent == "recurring_payments":
             return AgentResponse(
                 answer=(
@@ -366,6 +381,35 @@ class RuleBasedAgent:
                 tool_name=name,
             )
         return self._format(model_decision, name, data)
+
+    async def _create_reminder(self, text: str, language: str) -> AgentResponse:
+        """A local write: no external service, no money, reversible by the user."""
+        title = parse_title(text)
+        if self._reminders is None:
+            return AgentResponse(
+                answer="Reminders are not available on this device.",
+                intent="create_reminder",
+                language=language,
+            )
+        due = parse_due(text, now=datetime.now(UTC), timezone=self._timezone)
+        if due is None:
+            # Guessing a time would schedule the wrong thing silently.
+            return AgentResponse(
+                answer=finance_template(language, "reminder_needs_time").format(title=title),
+                intent="create_reminder",
+                language=language,
+                requires_confirmation=True,
+            )
+        reminder = await self._reminders.create(ReminderCreate(title=title, due_at=due))
+        local = due.astimezone(self._timezone)
+        return AgentResponse(
+            answer=finance_template(language, "reminder_created").format(
+                title=title, time=local.strftime("%I:%M %p").lstrip("0")
+            ),
+            intent="create_reminder",
+            language=language,
+            data={"id": reminder.id, "title": reminder.title, "due_at": local.isoformat()},
+        )
 
     def _tool_for(self, intent: str) -> tuple[str, dict[str, object]]:
         if self._remote:

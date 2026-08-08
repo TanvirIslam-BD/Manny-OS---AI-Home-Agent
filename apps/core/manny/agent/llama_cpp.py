@@ -34,7 +34,7 @@ Always respond in the language used by the current user message unless a languag
 provided. Set language to its short BCP-47 tag, such as en, bn, hi, zh, ja, es, or ar.
 
 Return exactly one JSON object with these fields:
-- intent: budget_status, category_spending, recurring_payments, or general
+- intent: create_reminder, budget_status, category_spending, recurring_payments, or general
 - reply: a natural response only when intent is general; otherwise an empty string
 - language: the response language tag
 - reply_template: empty for general; for finance, natural wording in the same language
@@ -45,6 +45,8 @@ Finance placeholders:
 - category_spending: {category}, {amount}
 - recurring_payments: {merchant}, {amount}, {due_date}
 
+Use create_reminder when the user asks to be reminded of something. The host reads
+the time and title from their words; leave reply empty.
 Use budget_status for budget remaining, limits, or overall budget progress.
 Use category_spending for expenses, spending totals, merchants, or spending categories.
 Use recurring_payments for subscriptions, recurring bills, or upcoming payments.

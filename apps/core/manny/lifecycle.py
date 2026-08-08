@@ -261,6 +261,7 @@ def build_services(settings: Settings) -> RuntimeServices:
         max_context_turns=settings.llm_context_turns,
         timezone=settings.user_timezone,
         memory=memory,
+        reminders=reminders,
     )
     stt: SpeechToText
     if settings.stt_backend == "whisper_cpp":
