@@ -56,7 +56,7 @@ class PhraseWakeWord:
     def matches(self, text: str) -> bool:
         return self._match(normalize(text)) is not None
 
-    def strip(self, text: str) -> str:
+    def without_phrase(self, text: str) -> str:
         """Remove the wake phrase, leaving the command the user actually spoke."""
         spoken = normalize(text)
         matched = self._match(spoken)

@@ -275,6 +275,17 @@ class RuleBasedAgent:
         else:
             async with self._conversation_lock:
                 history = list(self._history) if remember else []
+                if remember and self._memory is not None:
+                    # The recent window is short by design. Without retrieval a
+                    # fact stated more turns ago than the window is on disk but
+                    # never consulted, and the model answers as if never told.
+                    recalled = await self._memory.search(
+                        query.text, limit=4, skip_newest=len(history)
+                    )
+                    history = [
+                        ConversationMessage(role=item.role, content=item.content)
+                        for item in recalled
+                    ] + history
                 try:
                     model_decision = await self._model.decide(
                         query.text, history, query.language

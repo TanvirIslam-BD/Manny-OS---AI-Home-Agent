@@ -85,3 +85,40 @@ async def test_general_conversation_is_remembered_and_rehydrated(tmp_path: Path)
     await revived.forget()
 
     assert (await store.stats()).entries == 0
+
+
+async def test_a_fact_older_than_the_window_is_still_recalled(tmp_path: Path) -> None:
+    """Storage without retrieval is not memory."""
+    store = MemoryStore(tmp_path / "memory.sqlite3")
+    await store.initialize()
+    await store.remember(entries_from_turn("My name is Tanvir", "Noted, Tanvir.", "en"))
+    # Bury it well beyond any recent-window the model is given.
+    for turn in range(30):
+        await store.remember(entries_from_turn(f"chat {turn}", f"reply {turn}", "en"))
+
+    recalled = await store.search("what is my name", limit=4)
+
+    assert any("Tanvir" in item.content for item in recalled), (
+        "the name was stored but could not be retrieved"
+    )
+
+
+async def test_search_ignores_common_words(tmp_path: Path) -> None:
+    store = MemoryStore(tmp_path / "memory.sqlite3")
+    await store.initialize()
+    await store.remember(entries_from_turn("the weather is nice", "indeed", "en"))
+    await store.remember(entries_from_turn("my dog is called Rex", "good name", "en"))
+
+    recalled = await store.search("what is my dog called", limit=2)
+
+    # "is" and "my" must not drag in the unrelated turn.
+    assert recalled
+    assert all("weather" not in item.content for item in recalled)
+
+
+async def test_search_skips_entries_already_in_the_recent_window(tmp_path: Path) -> None:
+    store = MemoryStore(tmp_path / "memory.sqlite3")
+    await store.initialize()
+    await store.remember(entries_from_turn("my dog is Rex", "hello Rex", "en"))
+
+    assert await store.search("dog", limit=4, skip_newest=2) == []

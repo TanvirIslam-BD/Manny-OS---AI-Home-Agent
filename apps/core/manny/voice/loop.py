@@ -86,7 +86,7 @@ class VoiceLoop:
                 # "Hey Manny, how's my budget?" carries the command with it, so
                 # drop the phrase and act on the remainder.
                 transcript = transcript.model_copy(
-                    update={"text": self._wake_word.strip(spoken)}
+                    update={"text": self._wake_word.without_phrase(spoken)}
                 )
             elif not self._within_follow_up():
                 return None

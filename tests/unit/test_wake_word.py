@@ -75,10 +75,10 @@ def test_recognition_slips_still_wake_the_device() -> None:
 def test_the_phrase_is_stripped_so_the_command_survives() -> None:
     detector = wake_word()
 
-    assert detector.strip("Hey Manny, how is my budget?") == "how is my budget"
-    assert detector.strip("hi manny what is the weather") == "what is the weather"
+    assert detector.without_phrase("Hey Manny, how is my budget?") == "how is my budget"
+    assert detector.without_phrase("hi manny what is the weather") == "what is the weather"
     # Nothing after the phrase leaves the original text rather than an empty query.
-    assert detector.strip("hey manny") == "hey manny"
+    assert detector.without_phrase("hey manny") == "hey manny"
 
 
 async def test_speech_without_the_wake_phrase_is_ignored() -> None:
