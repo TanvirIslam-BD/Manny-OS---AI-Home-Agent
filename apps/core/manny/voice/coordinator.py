@@ -6,7 +6,12 @@ import asyncio
 
 from manny.agent import AgentQuery, RuleBasedAgent
 from manny.state import PrivacyState, RuntimeState, StateMachine
-from manny.voice.interfaces import SpeechToText, TextToSpeech, VoiceActivityDetector
+from manny.voice.interfaces import (
+    AudioPlayback,
+    SpeechToText,
+    TextToSpeech,
+    VoiceActivityDetector,
+)
 from manny.voice.models import AudioBuffer, VoiceTurnResult
 
 
@@ -23,12 +28,14 @@ class HalfDuplexVoiceCoordinator:
         vad: VoiceActivityDetector,
         agent: RuleBasedAgent,
         state: StateMachine,
+        speaker: AudioPlayback | None = None,
     ) -> None:
         self._stt = stt
         self._tts = tts
         self._vad = vad
         self._agent = agent
         self._state = state
+        self._speaker = speaker
         self._turn_lock = asyncio.Lock()
 
     async def run_turn(
@@ -56,6 +63,10 @@ class HalfDuplexVoiceCoordinator:
             spoken = await self._tts.synthesize(
                 response.answer, voice="manny", language=response.language
             )
+            if self._speaker is not None:
+                # Half-duplex: playback completes before the turn lock releases,
+                # so Manny never records its own speech.
+                await self._speaker.play(spoken)
             return VoiceTurnResult(
                 transcript=transcript,
                 answer=response.answer,

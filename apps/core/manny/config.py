@@ -81,7 +81,12 @@ class Settings(BaseSettings):
     display_rotation: Literal[0, 90, 180, 270] = 0
     display_scale: float = Field(default=1.0, gt=0, le=4)
 
+    voice_loop_enabled: bool = False
+    voice_capture_seconds: float = Field(default=3.0, ge=1, le=15)
+    voice_vad_threshold: float = Field(default=0.02, gt=0, le=1)
+
     camera_enabled: bool = True
+    person_detector: Literal["none", "opencv_hog"] = "none"
     face_recognition_enabled: bool = False
     quiet_hours_start: str = "22:00"
     quiet_hours_end: str = "07:00"
@@ -144,6 +149,8 @@ class Settings(BaseSettings):
             raise ValueError("production requires OS keyring token storage")
         if self.hardware_mode == "real" and not self.audio_device:
             raise ValueError("real hardware mode requires MANNY_AUDIO_DEVICE")
+        if self.voice_loop_enabled and self.hardware_mode != "real":
+            raise ValueError("the device voice loop requires real hardware mode")
         if not self.data_directory.is_absolute():
             raise ValueError("MANNY_DATA_DIRECTORY must be an absolute path")
         return self
