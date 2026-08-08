@@ -8,9 +8,11 @@ import io
 import json
 import os
 import subprocess
+import sys
 import tempfile
 import wave
 from array import array
+from math import sqrt
 from pathlib import Path
 from typing import Any
 
@@ -74,6 +76,36 @@ class KokoroTextToSpeech:
         return AudioBuffer(
             pcm=samples.tobytes(), sample_rate=24_000, language_hint=language
         )
+
+
+class EnergyVoiceActivity:
+    """RMS-threshold speech detection over signed 16-bit little-endian PCM.
+
+    Deterministic and dependency-free, so it behaves identically in CI and on
+    device. It gates recording, not recognition: a wake word can be layered in
+    front of it through `WakeWordDetector` without changing this contract.
+    """
+
+    def __init__(self, *, threshold: float = 0.02, minimum_seconds: float = 0.2) -> None:
+        self._threshold = threshold
+        self._minimum_seconds = minimum_seconds
+
+    async def contains_speech(self, audio: AudioBuffer) -> bool:
+        return await asyncio.to_thread(self._contains_speech_sync, audio)
+
+    def _contains_speech_sync(self, audio: AudioBuffer) -> bool:
+        sample_count = len(audio.pcm) // 2
+        if sample_count == 0:
+            return False
+        duration = sample_count / float(audio.sample_rate * audio.channels)
+        if duration < self._minimum_seconds:
+            return False
+        samples = array("h")
+        samples.frombytes(audio.pcm[: sample_count * 2])
+        if sys.byteorder != "little":
+            samples.byteswap()
+        mean_square = sum(value * value for value in samples) / len(samples)
+        return sqrt(mean_square) / 32_768 >= self._threshold
 
 
 class WhisperCppSpeechToText:

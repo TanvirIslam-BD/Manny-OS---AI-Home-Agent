@@ -19,6 +19,7 @@ from manny.state import PrivacyState, RuntimeSnapshot, RuntimeState, StateMachin
 from manny.storage import FinanceCache
 from manny.vision import PresenceEvent, VisionService
 from manny.voice import (
+    EnergyVoiceActivity,
     EspeakTextToSpeech,
     HalfDuplexVoiceCoordinator,
     KokoroTextToSpeech,
@@ -28,6 +29,8 @@ from manny.voice import (
     MoonshineSpeechToText,
     SpeechToText,
     TextToSpeech,
+    VoiceActivityDetector,
+    VoiceLoop,
     WhisperCppSpeechToText,
 )
 
@@ -41,6 +44,7 @@ class RuntimeServices:
     mcp: MockMCPClient | MoneyCopilotMCPClient
     agent: RuleBasedAgent
     voice: HalfDuplexVoiceCoordinator
+    voice_loop: VoiceLoop | None
     finance_cache: FinanceCache
     vision: VisionService
     reminders: ReminderStore
@@ -64,8 +68,12 @@ class RuntimeServices:
         await self.scheduler.start()
         if self.settings.camera_enabled:
             await self.vision.start()
+        if self.voice_loop is not None:
+            await self.voice_loop.start()
 
     async def stop(self) -> None:
+        if self.voice_loop is not None:
+            await self.voice_loop.stop()
         await self.mcp.stop()
         await self.vision.stop()
         await self.scheduler.stop()
@@ -197,6 +205,19 @@ def build_services(settings: Settings) -> RuntimeServices:
         if settings.hardware_mode == "real"
         else build_mock_hardware(camera_enabled=settings.camera_enabled)
     )
+    vad: VoiceActivityDetector = (
+        EnergyVoiceActivity(threshold=settings.voice_vad_threshold)
+        if settings.hardware_mode == "real"
+        else MockVoiceActivity()
+    )
+    voice = HalfDuplexVoiceCoordinator(
+        stt=stt,
+        tts=tts,
+        vad=vad,
+        agent=agent,
+        state=state,
+        speaker=hardware.audio_output,
+    )
     services = RuntimeServices(
         settings=settings,
         state=state,
@@ -204,12 +225,16 @@ def build_services(settings: Settings) -> RuntimeServices:
         hardware=hardware,
         mcp=mcp,
         agent=agent,
-        voice=HalfDuplexVoiceCoordinator(
-            stt=stt,
-            tts=tts,
-            vad=MockVoiceActivity(),
-            agent=agent,
-            state=state,
+        voice=voice,
+        voice_loop=(
+            VoiceLoop(
+                hardware.audio_input,
+                voice,
+                state,
+                chunk_seconds=settings.voice_capture_seconds,
+            )
+            if settings.voice_loop_enabled
+            else None
         ),
         finance_cache=finance_cache,
         vision=VisionService(

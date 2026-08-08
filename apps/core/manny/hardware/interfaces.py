@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
+
+if TYPE_CHECKING:  # keeps manny.hardware importable from manny.voice without a cycle
+    from manny.voice.models import AudioBuffer
 
 
 class LedState(StrEnum):
@@ -34,10 +37,12 @@ class LedAdapter(Protocol):
 class AudioInputAdapter(Protocol):
     async def set_muted(self, muted: bool) -> None: ...
     async def is_muted(self) -> bool: ...
+    async def capture(self, seconds: float) -> AudioBuffer: ...
 
 
 class AudioOutputAdapter(Protocol):
     async def set_volume(self, value: float) -> None: ...
+    async def play(self, audio: AudioBuffer) -> None: ...
 
 
 class DisplayControl(Protocol):

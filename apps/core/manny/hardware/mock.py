@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from manny.hardware.interfaces import HardwareBundle, LedState
+from manny.voice.models import AudioBuffer
 
 
 @dataclass(slots=True)
@@ -34,6 +35,7 @@ class MockLed:
 @dataclass(slots=True)
 class MockAudioInput:
     muted: bool = False
+    simulated_pcm: bytes = b""
 
     async def set_muted(self, muted: bool) -> None:
         self.muted = muted
@@ -41,13 +43,21 @@ class MockAudioInput:
     async def is_muted(self) -> bool:
         return self.muted
 
+    async def capture(self, seconds: float) -> AudioBuffer:
+        del seconds
+        return AudioBuffer(pcm=b"" if self.muted else self.simulated_pcm)
+
 
 @dataclass(slots=True)
 class MockAudioOutput:
     volume: float = 0.7
+    played: list[AudioBuffer] = field(default_factory=list)
 
     async def set_volume(self, value: float) -> None:
         self.volume = min(1.0, max(0.0, value))
+
+    async def play(self, audio: AudioBuffer) -> None:
+        self.played.append(audio)
 
 
 @dataclass(slots=True)
