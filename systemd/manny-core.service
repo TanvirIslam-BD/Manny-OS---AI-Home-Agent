@@ -1,7 +1,7 @@
 [Unit]
 Description=Manny OS Core
-After=network-online.target
-Wants=network-online.target
+After=network-online.target manny-llm.service
+Wants=network-online.target manny-llm.service
 
 [Service]
 Type=simple

@@ -9,12 +9,46 @@ Manny OS is the application stack for **Manny Copilot**, a stationary AI home an
 - Official MCP Python SDK v2 client for Streamable HTTP and OAuth 2.1 account authorization
 - Safe MCP status/tool discovery with an explicit tool allowlist before any tool can execute
 - Live device dashboard populated from validated MCP budget and category summaries, with refresh and offline-cache labels
+- Local Gemma 3 1B IT conversational agent through a loopback-only llama.cpp server, with short in-memory context and deterministic fallback
 - One authoritative, validated application state machine
 - Typed settings loaded from defaults, YAML profiles, and `MANNY_*` environment variables
 - Mock camera, microphone, speaker, LED, and display adapters
 - Unit and API tests that run without Raspberry Pi hardware
 
 The finance display contains no hard-coded amounts. It shows setup/loading/unavailable states until validated MCP data arrives; cached answers disclose their last-sync time.
+
+## Local Gemma companion
+
+Raspberry Pi and production profiles use `gemma-3-1b-it-Q4_K_M.gguf` through `llama-server` on `127.0.0.1:8080`. The model handles friendly general conversation and natural-language intent routing. It never receives MCP credentials or executes tools; financial facts still pass through the policy broker and validated MCP contracts.
+
+On a reviewed Raspberry Pi installation:
+
+```bash
+sudo ./scripts/bootstrap_pi.sh
+sudo ./scripts/install_app_pi.sh
+cd /opt/manny
+sudo install -o manny -g manny -m 0600 configs/raspberrypi.env.example .env
+sudoedit .env
+sudo ./scripts/install_gemma_pi.sh
+sudo ./scripts/install_systemd.sh
+```
+
+Use 64-bit Raspberry Pi OS with Python 3.12 or newer. The app installer copies the
+reviewed tree without `.env`, credentials, local data, Git metadata, or build caches, then
+creates the virtual environment and production UI. The Gemma installer requires explicit
+license confirmation, pins the llama.cpp source ref, verifies the 806 MB model's SHA-256
+checksum, and does not enable services automatically. Copy and edit `.env.example` as
+`/opt/manny/.env` with the real timezone and MCP endpoint, run
+`scripts/verify_hardware.sh`, and enable services only after review.
+
+For the Windows desktop simulator:
+
+```powershell
+.\scripts\install_gemma_windows.ps1
+.\scripts\start_gemma_windows.ps1
+```
+
+Both the pinned runtime and model remain in the ignored `data/` directory. The development profile connects to the loopback server automatically and falls back safely when it is not running.
 
 ## Money Copilot MCP
 

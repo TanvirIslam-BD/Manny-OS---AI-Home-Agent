@@ -18,6 +18,11 @@ def test_non_loopback_api_binding_is_rejected() -> None:
         Settings(api_host="0.0.0.0")
 
 
+def test_local_llm_cannot_send_conversation_to_remote_host() -> None:
+    with pytest.raises(ValidationError, match="loopback"):
+        Settings(llm_base_url="https://models.example.test")
+
+
 def test_face_recognition_cannot_be_silently_enabled() -> None:
     with pytest.raises(ValidationError, match="face recognition"):
         Settings(face_recognition_enabled=True)

@@ -6,6 +6,7 @@ import os
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, Literal
+from urllib.parse import urlparse
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import yaml
@@ -60,7 +61,12 @@ class Settings(BaseSettings):
 
     stt_backend: str = "mock"
     tts_backend: str = "mock"
-    llm_backend: str = "mock"
+    llm_backend: Literal["mock", "llama_cpp"] = "mock"
+    llm_base_url: str = "http://127.0.0.1:8080"
+    llm_model: str = "gemma-3-1b-it"
+    llm_timeout_seconds: float = Field(default=60, gt=0, le=180)
+    llm_max_tokens: int = Field(default=192, ge=32, le=512)
+    llm_context_turns: int = Field(default=6, ge=1, le=12)
 
     display_width: int | None = Field(default=480, ge=1)
     display_height: int | None = Field(default=480, ge=1)
@@ -90,6 +96,16 @@ class Settings(BaseSettings):
         if value not in {"127.0.0.1", "localhost", "::1"}:
             raise ValueError("Manny's local API must bind to loopback")
         return value
+
+    @field_validator("llm_base_url")
+    @classmethod
+    def local_llm_must_be_loopback(cls, value: str) -> str:
+        parsed = urlparse(value)
+        if parsed.scheme != "http" or parsed.hostname not in {"127.0.0.1", "localhost", "::1"}:
+            raise ValueError("local LLM URL must use HTTP on a loopback host")
+        if parsed.username or parsed.password or parsed.query or parsed.fragment:
+            raise ValueError("local LLM URL must not contain credentials, query, or fragment")
+        return value.rstrip("/")
 
     @field_validator("user_timezone")
     @classmethod

@@ -689,6 +689,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "fastapi" },
+    { name = "httpx" },
     { name = "mcp" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
@@ -700,7 +701,6 @@ dependencies = [
 [package.optional-dependencies]
 dev = [
     { name = "build" },
-    { name = "httpx" },
     { name = "mypy" },
     { name = "pip-audit" },
     { name = "pytest" },
@@ -716,7 +716,7 @@ production = [
 requires-dist = [
     { name = "build", marker = "extra == 'dev'", specifier = ">=1.2,<2" },
     { name = "fastapi", specifier = ">=0.116,<1" },
-    { name = "httpx", marker = "extra == 'dev'", specifier = ">=0.28,<1" },
+    { name = "httpx", specifier = ">=0.28,<1" },
     { name = "keyring", marker = "extra == 'production'", specifier = ">=25,<26" },
     { name = "mcp", specifier = ">=2,<3" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.17,<2" },

@@ -22,6 +22,7 @@ All notable changes to Manny OS are documented here.
 - Configurable Pi adapters, systemd, bootstrap, and hardware verification
 - Reset, redaction, security headers, metrics, security CI, and signed-update verification
 - Live MCP-backed device cards, persistent MCP sessions, request coalescing, and verified-data refresh controls
+- Gemma 3 1B IT llama.cpp adapter, short conversational context, schema-validated routing, deterministic fallback, and hardened Pi model service
 
 ### Security
 

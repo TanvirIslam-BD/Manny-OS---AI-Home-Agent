@@ -22,6 +22,8 @@ check 'audio playback utility' command -v aplay
 check 'audio capture device' bash -c 'arecord -l | grep -q card'
 check 'audio playback device' bash -c 'aplay -l | grep -q card'
 check 'Chromium kiosk' command -v chromium
+check 'llama.cpp server' test -x /opt/manny/llama.cpp/build/bin/llama-server
+check 'Gemma model' test -r /opt/manny/models/gemma-3-1b-it-Q4_K_M.gguf
 
 if (( failures > 0 )); then
   printf '%s hardware checks failed; see docs/hardware.md\n' "$failures" >&2

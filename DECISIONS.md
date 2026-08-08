@@ -83,3 +83,9 @@ Decision: Store reminders and minimal timestamped finance cache in SQLite. Devel
 Status: Accepted
 
 Decision: Keep Moonshine, Kokoro, Picamera2, and ALSA behind protocols and load them only in configured device modes so desktop development and CI stay deterministic.
+
+## ADR-015 — Local conversational model
+
+Status: Accepted
+
+Decision: Use Gemma 3 1B Instruction-Tuned Q4_K_M as the initial Raspberry Pi 5 8 GB conversational model through a loopback-only llama.cpp server. Constrain and validate its routing output, keep only short volatile non-financial context, never expose credentials, and preserve deterministic policy and fallback behavior. Treat a move to a larger model as a benchmark-driven hardware decision.

@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import time
 from typing import Any
 
-from manny.agent import RuleBasedAgent, ToolBroker
+from manny.agent import LlamaCppAgentModel, RuleBasedAgent, ToolBroker
 from manny.api.events import EventBus
 from manny.config import Settings
 from manny.hardware import HardwareBundle, LedState, build_mock_hardware, build_real_hardware
@@ -114,7 +114,12 @@ class RuntimeServices:
             if phase in {MCPConnectionPhase.CONNECTED, MCPConnectionPhase.MOCK}
             else phase.value
         )
-        status = "ok" if money_status == "ok" else "degraded"
+        llm_status = self.agent.model_status
+        status = (
+            "ok"
+            if money_status == "ok" and llm_status in {"mock", "ok", "not_checked"}
+            else "degraded"
+        )
         return {
             "status": status,
             "components": {
@@ -123,7 +128,7 @@ class RuntimeServices:
                 "microphone": "muted" if self.state.snapshot.microphone_muted else "ok",
                 "speaker": "ok",
                 "camera": "ok" if self.state.snapshot.camera_enabled else "disabled",
-                "llm": "mock",
+                "llm": llm_status,
                 "money_mcp": money_status,
             },
         }
@@ -138,9 +143,21 @@ def build_services(settings: Settings) -> RuntimeServices:
         time.fromisoformat(settings.quiet_hours_start),
         time.fromisoformat(settings.quiet_hours_end),
     )
+    model = (
+        LlamaCppAgentModel(
+            base_url=settings.llm_base_url,
+            model=settings.llm_model,
+            timeout_seconds=settings.llm_timeout_seconds,
+            max_tokens=settings.llm_max_tokens,
+        )
+        if settings.llm_backend == "llama_cpp"
+        else None
+    )
     agent = RuleBasedAgent(
         ToolBroker(mcp, PolicyEngine(), finance_cache),
         remote=settings.mcp_mode == "remote_http",
+        model=model,
+        max_context_turns=settings.llm_context_turns,
     )
     stt = MoonshineSpeechToText() if settings.stt_backend == "moonshine" else MockSpeechToText()
     tts = KokoroTextToSpeech() if settings.tts_backend == "kokoro" else MockTextToSpeech()

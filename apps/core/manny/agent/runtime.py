@@ -4,16 +4,21 @@ from __future__ import annotations
 
 import asyncio
 import json
+from collections import deque
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Protocol
 
 from manny.agent.models import (
+    AgentDecision,
+    AgentIntent,
     AgentQuery,
     AgentResponse,
     BudgetSummary,
     CategorySummary,
+    ConversationMessage,
     RecurringSummary,
+    is_non_personal_education,
 )
 from manny.policy import PolicyDecision, PolicyEngine, ToolRequest
 from manny.state import PrivacyState
@@ -28,19 +33,68 @@ class ToolClient(Protocol):
 
 
 class IntentModel(Protocol):
-    async def classify(self, text: str) -> str: ...
+    @property
+    def status(self) -> str: ...
+
+    async def decide(
+        self, text: str, history: list[ConversationMessage]
+    ) -> AgentDecision: ...
 
 
 class DeterministicIntentModel:
-    async def classify(self, text: str) -> str:
+    @property
+    def status(self) -> str:
+        return "mock"
+
+    async def classify(self, text: str) -> AgentIntent:
         value = text.casefold()
+        if is_non_personal_education(text):
+            return "general"
         if "budget" in value:
             return "budget_status"
-        if any(word in value for word in ("spend", "spent", "expense", "category")):
+        if any(
+            word in value
+            for word in (
+                "spend",
+                "spent",
+                "expense",
+                "category",
+                "transaction",
+                "purchase",
+                "bought",
+                "merchant",
+                "money going",
+                "dining",
+                "restaurant",
+                "grocer",
+            )
+        ):
             return "category_spending"
-        if any(word in value for word in ("recurring", "payment", "upcoming", "subscription")):
+        if any(
+            word in value
+            for word in ("recurring", "payment", "upcoming", "subscription", "bill", "due")
+        ):
             return "recurring_payments"
-        return "unknown"
+        return "general"
+
+    async def decide(
+        self, text: str, history: list[ConversationMessage]
+    ) -> AgentDecision:
+        del history
+        intent = await self.classify(text)
+        if intent != "general":
+            return AgentDecision(intent=intent, reply="")
+        value = text.casefold()
+        if any(word in value for word in ("hello", "hi", "hey")):
+            reply = "Hi! I'm Manny. How can I help around your desk today?"
+        elif "thank" in value:
+            reply = "You're welcome. I'm here whenever you need me."
+        else:
+            reply = (
+                "I'm here to chat and help, but my local conversational model is not "
+                "available right now."
+            )
+        return AgentDecision(intent="general", reply=reply)
 
 
 class ToolBroker:
@@ -94,21 +148,53 @@ class ToolBroker:
 
 
 class RuleBasedAgent:
-    """Deterministic development model; replaceable without changing the broker."""
+    """Conversational agent with deterministic, policy-gated financial tool execution."""
 
     def __init__(
-        self, broker: ToolBroker, *, remote: bool, model: IntentModel | None = None
+        self,
+        broker: ToolBroker,
+        *,
+        remote: bool,
+        model: IntentModel | None = None,
+        max_context_turns: int = 6,
     ) -> None:
         self._broker = broker
         self._remote = remote
         self._model = model or DeterministicIntentModel()
+        self._fallback_model = DeterministicIntentModel()
+        self._history: deque[ConversationMessage] = deque(maxlen=max_context_turns * 2)
+        self._conversation_lock = asyncio.Lock()
+
+    @property
+    def model_status(self) -> str:
+        return self._model.status
 
     async def answer(self, query: AgentQuery, *, privacy: PrivacyState) -> AgentResponse:
-        intent = await self._model.classify(query.text)
-        if intent == "unknown":
-            return AgentResponse(
-                answer="I can help with budgets, spending, and upcoming payments.", intent=intent
-            )
+        remember = privacy in {PrivacyState.PRIVATE_IDLE, PrivacyState.PRESENT_TRUSTED}
+        deterministic_intent = await self._fallback_model.classify(query.text)
+        intent: AgentIntent
+        if deterministic_intent != "general":
+            intent = deterministic_intent
+        else:
+            async with self._conversation_lock:
+                history = list(self._history) if remember else []
+                try:
+                    model_decision = await self._model.decide(query.text, history)
+                except RuntimeError:
+                    model_decision = await self._fallback_model.decide(query.text, history)
+                intent = model_decision.intent
+                if intent == "general":
+                    answer = (
+                        model_decision.reply.strip() or "I'm here. What would you like to do?"
+                    )
+                    if remember:
+                        self._history.extend(
+                            (
+                                ConversationMessage(role="user", content=query.text),
+                                ConversationMessage(role="assistant", content=answer),
+                            )
+                        )
+                    return AgentResponse(answer=answer, intent=intent)
         if self._remote and intent == "recurring_payments":
             return AgentResponse(
                 answer=(

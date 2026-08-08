@@ -1,4 +1,4 @@
-.PHONY: setup dev test lint typecheck ui run mock-mcp build install-pi health
+.PHONY: setup dev test lint typecheck ui run mock-mcp build install-pi install-app-pi install-gemma-pi health
 
 PYTHON ?= python
 NPM ?= npm
@@ -35,6 +35,12 @@ build:
 
 install-pi:
 	./scripts/bootstrap_pi.sh
+
+install-app-pi:
+	./scripts/install_app_pi.sh
+
+install-gemma-pi:
+	./scripts/install_gemma_pi.sh
 
 health:
 	$(PYTHON) scripts/health.py

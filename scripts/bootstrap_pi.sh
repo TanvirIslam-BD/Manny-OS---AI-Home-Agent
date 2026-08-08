@@ -13,7 +13,7 @@ read -r -p 'Install Manny OS prerequisites and service user? [y/N] ' answer
 [[ "${answer}" == y || "${answer}" == Y ]] || exit 0
 
 apt-get update
-apt-get install -y --no-install-recommends python3-venv python3-pip nodejs npm chromium alsa-utils rpicam-apps
+apt-get install -y --no-install-recommends python3-venv python3-pip nodejs npm chromium alsa-utils rpicam-apps rsync
 id manny >/dev/null 2>&1 || useradd --system --create-home --shell /usr/sbin/nologin manny
 install -d -o manny -g manny -m 0750 /opt/manny
-echo 'Prerequisites installed. Copy a release to /opt/manny, provision .env, then run install_systemd.sh.'
+echo 'Prerequisites installed. Run install_app_pi.sh from the reviewed Manny source tree.'
