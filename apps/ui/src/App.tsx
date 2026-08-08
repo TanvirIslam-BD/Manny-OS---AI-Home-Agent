@@ -7,6 +7,7 @@ import {
   getMcpStatus,
   getState,
   pushToTalk,
+  cancelInteraction,
   setPresence,
   setSimulatorState,
   simulateVoice,
@@ -224,6 +225,10 @@ function App() {
   }
 
   async function startVoiceTurn() {
+    if (!supportsBrowserVoice()) {
+      setError('This browser cannot capture speech. Use the typed question box, or run Manny on the device.')
+      return
+    }
     setBusy(true)
     setError(null)
     try {
@@ -246,6 +251,7 @@ function App() {
       speak(response.answer, response.language)
     } catch (reason) {
       setError(messageFrom(reason))
+      setSnapshot(await cancelInteraction().catch(() => snapshot))
     } finally {
       setBusy(false)
     }
@@ -290,7 +296,7 @@ function App() {
                       type="button"
                       disabled={busy || snapshot.microphone_muted}
                       aria-label={snapshot.microphone_muted ? 'Microphone muted' : 'Talk to Manny'}
-                      onClick={() => void run(pushToTalk)}
+                      onClick={() => void startVoiceTurn()}
                     >
                       <Icon name="mic" />
                     </button>
@@ -334,7 +340,7 @@ function App() {
                   className={`ask-button ${snapshot.state === 'LISTENING' ? 'ask-button--listening' : ''}`}
                   type="button"
                   disabled={busy || snapshot.microphone_muted}
-                  onClick={() => void run(pushToTalk)}
+                  onClick={() => void startVoiceTurn()}
                 >
                   <Icon name="mic" />
                   <span>{snapshot.microphone_muted ? 'Microphone muted' : snapshot.state === 'LISTENING' ? 'Listening…' : 'Ask Manny'}</span>
@@ -353,10 +359,17 @@ function App() {
                   </div>
                 )}
 
+                {error && (
+                  <div className="screen__toast" role="alert">
+                    <span>{error}</span>
+                    <button type="button" onClick={() => setError(null)} aria-label="Dismiss">✕</button>
+                  </div>
+                )}
+
                 <nav className="screen__nav" aria-label="Device navigation">
                   <button className={deviceView === 'home' ? 'is-active' : ''} aria-pressed={deviceView === 'home'} type="button" onClick={() => setDeviceView('home')}><Icon name="home" /><span>Home</span></button>
                   <button className={deviceView === 'insights' ? 'is-active' : ''} aria-pressed={deviceView === 'insights'} type="button" onClick={() => setDeviceView('insights')}><Icon name="chart" /><span>Insights</span></button>
-                  <button className="nav-orb" type="button" onClick={() => void run(pushToTalk)} aria-label="Talk to Manny"><span>M</span></button>
+                  <button className="nav-orb" type="button" disabled={busy || snapshot.microphone_muted} onClick={() => void startVoiceTurn()} aria-label="Talk to Manny"><span>M</span></button>
                   <button className={deviceView === 'alerts' ? 'is-active' : ''} aria-pressed={deviceView === 'alerts'} type="button" onClick={() => setDeviceView('alerts')}><Icon name="bell" /><span>Alerts</span></button>
                   <button className={deviceView === 'settings' ? 'is-active' : ''} aria-pressed={deviceView === 'settings'} type="button" onClick={() => setDeviceView('settings')}><Icon name="gear" /><span>Settings</span></button>
                 </nav>

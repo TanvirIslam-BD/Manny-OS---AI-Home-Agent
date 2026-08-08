@@ -41,6 +41,10 @@ export async function pushToTalk(): Promise<RuntimeSnapshot> {
   return postJson('/api/interaction/push-to-talk', {})
 }
 
+export async function cancelInteraction(): Promise<RuntimeSnapshot> {
+  return postJson('/api/interaction/cancel', {})
+}
+
 export async function setListening(enabled: boolean): Promise<RuntimeSnapshot> {
   return postJson('/api/device/listening', { enabled })
 }

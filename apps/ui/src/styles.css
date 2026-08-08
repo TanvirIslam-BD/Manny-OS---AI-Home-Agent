@@ -299,11 +299,12 @@ svg { width: 1.3rem; height: 1.3rem; }
 .privacy-card strong { display: block; margin-top: 4px; font: 700 .82rem/1.2 Manrope, sans-serif; }
 .privacy-card p { margin: 5px 0 0; color: #8fa1ae; font-size: .58rem; line-height: 1.4; }
 
-.ask-button { flex: 0 0 auto;
-  position: absolute;
+.ask-button {
+  flex: 0 0 auto;
+  position: relative;
   z-index: 5;
-  left: 50%; bottom: 58px;
-  transform: translateX(-50%);
+  align-self: center;
+  margin: 2px 0 0;
   min-width: 128px;
   min-height: 33px;
   padding: 7px 14px;
@@ -412,6 +413,24 @@ svg { width: 1.3rem; height: 1.3rem; }
 .device-panel strong { font: 700 .82rem/1.25 Manrope, sans-serif; }
 .device-panel p { margin: 0; color: #8299ab; font-size: .58rem; line-height: 1.45; }
 .device-panel code { align-self: flex-start; margin-top: 4px; padding: 6px 9px; color: var(--teal); border-radius: 7px; background: rgba(38,239,196,.08); font-size: .62rem; letter-spacing: .08em; }
+.screen__toast {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  padding: 7px 10px;
+  border: 1px solid rgba(255, 84, 103, .35);
+  border-radius: 10px;
+  background: rgba(46, 10, 18, .92);
+  color: #ffc9d0;
+  font-size: .55rem;
+  line-height: 1.35;
+}
+.screen__toast span { flex: 1 1 auto; }
+.screen__toast button { min-width: 22px; min-height: 22px; padding: 0; color: #ffc9d0; border: 0; border-radius: 6px; background: rgba(255,255,255,.08); cursor: pointer; }
+.simulator-shell--kiosk .screen__toast { font-size: 2.3vmin; padding: 1.8vmin; border-radius: 2.2vmin; }
+
 .device-settings__mcp { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; text-align: left; }
 .device-settings__mcp small { color: #8299ab; font-size: .5rem; font-weight: 400; }
 .webview {
