@@ -141,3 +141,16 @@ async def test_espeak_uses_language_voice_and_returns_pcm(
 
     assert audio.sample_rate == 22_050
     assert audio.language_hint == "bn-BD"
+
+
+def test_whisper_language_prefers_an_explicit_choice_over_detection() -> None:
+    from manny.voice.local import _whisper_language
+
+    # A configured language must win, so Bangla is not left to chunk detection.
+    assert _whisper_language("bn-BD", "auto") == "bn"
+    assert _whisper_language(None, "bn-BD") == "bn"
+    assert _whisper_language("auto", "bn-BD") == "bn"
+    # Detection stays available when nothing is configured.
+    assert _whisper_language(None, "auto") == "auto"
+    assert _whisper_language(None, "") == "auto"
+    assert _whisper_language("zh-CN", "auto") == "zh"

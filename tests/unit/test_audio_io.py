@@ -133,3 +133,14 @@ async def test_voice_loop_survives_a_failing_microphone() -> None:
         assert loop._task is not None and not loop._task.done()
     finally:
         await loop.stop()
+
+
+async def test_capture_carries_the_configured_language_to_recognition() -> None:
+    coordinator, state = build_coordinator(MockAudioOutput())
+    microphone = MockAudioInput(simulated_pcm=b"kemon acho")
+    loop = VoiceLoop(microphone, coordinator, state, language="bn-BD")
+
+    result = await loop.poll_once()
+
+    assert result is not None
+    assert result.transcript.language == "bn-BD"

@@ -118,11 +118,13 @@ class WhisperCppSpeechToText:
         model: Path,
         threads: int = 4,
         timeout_seconds: float = 90,
+        default_language: str = "auto",
     ) -> None:
         self._binary = binary
         self._model = model
         self._threads = threads
         self._timeout = timeout_seconds
+        self._default_language = default_language
 
     async def transcribe(self, audio: AudioBuffer) -> Transcript:
         return await asyncio.to_thread(self._transcribe_sync, audio)
@@ -144,7 +146,7 @@ class WhisperCppSpeechToText:
                 "-f",
                 str(audio_path),
                 "-l",
-                "auto",
+                _whisper_language(audio.language_hint, self._default_language),
                 "-t",
                 str(self._threads),
                 "-oj",
@@ -236,3 +238,16 @@ def _kokoro_language(language: str, fallback: str) -> str:
 
 def _espeak_language(language: str) -> str:
     return {"zh": "cmn"}.get(base_language(language), base_language(language))
+
+
+def _whisper_language(hint: str | None, default: str) -> str:
+    """Prefer an explicit language over detection.
+
+    whisper.cpp language identification is unreliable on the short chunks the
+    device records, and it confuses Bengali with neighbouring scripts. When the
+    user has chosen a language, transcribe in it instead of guessing.
+    """
+    for candidate in (hint, default):
+        if candidate and candidate.casefold() != "auto":
+            return base_language(candidate)
+    return "auto"
