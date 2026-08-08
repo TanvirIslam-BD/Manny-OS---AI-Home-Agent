@@ -1,0 +1,40 @@
+.PHONY: setup dev test lint typecheck ui run mock-mcp build install-pi health
+
+PYTHON ?= python
+NPM ?= npm
+
+setup:
+	$(PYTHON) -m pip install -e ".[dev]"
+	cd apps/ui && $(NPM) install
+
+dev:
+	$(PYTHON) scripts/dev.py
+
+test:
+	$(PYTHON) -m pytest
+
+lint:
+	$(PYTHON) -m ruff check apps/core tests
+	cd apps/ui && $(NPM) run lint
+
+typecheck:
+	$(PYTHON) -m mypy apps/core/manny
+	cd apps/ui && $(NPM) run typecheck
+
+ui:
+	cd apps/ui && $(NPM) run dev -- --host 127.0.0.1
+
+run:
+	$(PYTHON) -m uvicorn manny.main:app --app-dir apps/core --host 127.0.0.1 --port 8765 --no-access-log
+
+mock-mcp:
+	@echo "Mock Money Copilot MCP is planned for Phase 2."
+
+build:
+	cd apps/ui && $(NPM) run build
+
+install-pi:
+	@echo "Raspberry Pi installation is planned for Phase 7."
+
+health:
+	$(PYTHON) scripts/health.py

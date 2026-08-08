@@ -1,0 +1,45 @@
+# Environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+secrets/
+credentials/
+tokens/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+
+# JavaScript
+node_modules/
+dist/
+.tmp/
+
+# Local data and logs
+data/
+logs/
+cache/
+*.db
+*.sqlite
+*.sqlite3
+
+# OS and editors
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Device and test artifacts
+build/
+release/
+*.img
+coverage/

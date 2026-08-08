@@ -1,0 +1,18 @@
+[Unit]
+Description=Manny OS Core
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=manny
+WorkingDirectory=/opt/manny
+ExecStart=/opt/manny/.venv/bin/python -m uvicorn manny.main:app --app-dir apps/core --host 127.0.0.1 --port 8765 --no-access-log
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=15
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

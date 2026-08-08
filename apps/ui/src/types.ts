@@ -1,0 +1,61 @@
+export type RuntimeState =
+  | 'BOOTING'
+  | 'PAIRING'
+  | 'IDLE'
+  | 'PRESENT'
+  | 'LISTENING'
+  | 'TRANSCRIBING'
+  | 'THINKING'
+  | 'CONFIRMING'
+  | 'SPEAKING'
+  | 'DASHBOARD'
+  | 'ALERT'
+  | 'OFFLINE'
+  | 'CAMERA_DISABLED'
+  | 'MIC_MUTED'
+  | 'ERROR'
+
+export type PrivacyState =
+  | 'PRIVATE_IDLE'
+  | 'PRESENT_UNKNOWN'
+  | 'PRESENT_TRUSTED'
+  | 'MULTIPLE_PEOPLE'
+  | 'PRIVACY_LOCKED'
+
+export interface RuntimeSnapshot {
+  state: RuntimeState
+  privacy: PrivacyState
+  connected: boolean
+  presence: boolean
+  people_count: number
+  microphone_muted: boolean
+  camera_enabled: boolean
+  status_message: string
+  sequence: number
+  updated_at: string
+}
+
+export type MCPConnectionPhase =
+  | 'mock'
+  | 'disabled'
+  | 'connecting'
+  | 'auth_required'
+  | 'connected'
+  | 'degraded'
+  | 'error'
+
+export interface MCPStatus {
+  phase: MCPConnectionPhase
+  connected: boolean
+  server_name: string
+  protocol_version: string | null
+  authorization_url: string | null
+  discovered_tools: string[]
+  allowed_tools: string[]
+  detail: string
+  checked_at: string
+}
+
+export type MannyEvent =
+  | { type: 'system.state'; payload: RuntimeSnapshot }
+  | { type: 'mcp.status'; payload: MCPStatus }

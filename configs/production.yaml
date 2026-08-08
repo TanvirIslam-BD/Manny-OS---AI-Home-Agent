@@ -1,0 +1,8 @@
+environment: production
+hardware_mode: real
+mcp_mode: remote_http
+camera_enabled: true
+face_recognition_enabled: false
+api_host: 127.0.0.1
+api_port: 8765
+log_level: INFO
