@@ -84,3 +84,14 @@ def test_voice_loop_is_on_by_default_but_only_runs_on_real_hardware() -> None:
         _env_file=None,
     )
     assert disabled.voice_loop_active is False
+
+
+def test_vision_and_text_models_are_served_separately() -> None:
+    settings = Settings(_env_file=None)
+
+    # One llama-server serves one model, so a vision model needs its own port
+    # unless a single multimodal model is serving both.
+    assert settings.vision_language_base_url != settings.llm_base_url
+
+    with pytest.raises(ValidationError):
+        Settings(vision_language_base_url="https://vision.example.com", _env_file=None)

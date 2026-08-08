@@ -90,6 +90,10 @@ class Settings(BaseSettings):
 
     camera_enabled: bool = True
     vision_language_backend: Literal["none", "llama_cpp"] = "none"
+    # A second llama-server: one instance serves one model, and a vision-capable
+    # model is not the same file as the 1B text model. Point this at the text
+    # server only if a single multimodal model is serving both.
+    vision_language_base_url: str = "http://127.0.0.1:8081"
     vision_language_model: str = "gemma-3-4b-it"
     vision_language_timeout_seconds: float = Field(default=120, gt=0, le=300)
     person_detector: Literal["none", "opencv_hog"] = "none"
@@ -116,7 +120,7 @@ class Settings(BaseSettings):
             raise ValueError("Manny's local API must bind to loopback")
         return value
 
-    @field_validator("llm_base_url")
+    @field_validator("llm_base_url", "vision_language_base_url")
     @classmethod
     def local_llm_must_be_loopback(cls, value: str) -> str:
         parsed = urlparse(value)

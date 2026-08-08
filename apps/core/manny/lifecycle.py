@@ -281,7 +281,7 @@ def build_services(settings: Settings) -> RuntimeServices:
         camera=hardware.camera,
         vision_model=build_vision_language_model(
             settings.vision_language_backend,
-            base_url=settings.llm_base_url,
+            base_url=settings.vision_language_base_url,
             model=settings.vision_language_model,
             timeout_seconds=settings.vision_language_timeout_seconds,
         ),
