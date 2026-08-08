@@ -5,10 +5,11 @@ from __future__ import annotations
 import asyncio
 import json
 from collections import deque
-from datetime import UTC, datetime
-from decimal import Decimal
+from datetime import UTC, datetime, timedelta, tzinfo
+from decimal import Decimal, InvalidOperation
 from string import Formatter
 from typing import Protocol
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from manny.agent.models import (
     AgentDecision,
@@ -219,6 +220,7 @@ class RuleBasedAgent:
         remote: bool,
         model: IntentModel | None = None,
         max_context_turns: int = 6,
+        timezone: str = "UTC",
     ) -> None:
         self._broker = broker
         self._remote = remote
@@ -226,6 +228,7 @@ class RuleBasedAgent:
         self._fallback_model = DeterministicIntentModel()
         self._history: deque[ConversationMessage] = deque(maxlen=max_context_turns * 2)
         self._conversation_lock = asyncio.Lock()
+        self._timezone: tzinfo = _resolve_timezone(timezone)
 
     @property
     def model_status(self) -> str:
@@ -325,9 +328,16 @@ class RuleBasedAgent:
 
     def _tool_for(self, intent: str) -> tuple[str, dict[str, object]]:
         if self._remote:
+            # Both tools must be pinned to the same window. `summarize_expenses`
+            # defaults to all-time when no range is sent, which would otherwise be
+            # displayed beside a current-month budget as if the two were comparable.
+            month, period_start, period_end = _current_month_window(self._timezone)
             remote_mapping: dict[str, tuple[str, dict[str, object]]] = {
-                "budget_status": ("get_budget_status", {}),
-                "category_spending": ("summarize_expenses", {"group_by": "category"}),
+                "budget_status": ("get_budget_status", {"month": month}),
+                "category_spending": (
+                    "summarize_expenses",
+                    {"group_by": "category", "from": period_start, "to": period_end},
+                ),
             }
             return remote_mapping[intent]
         mock_mapping: dict[str, tuple[str, dict[str, object]]] = {
@@ -370,6 +380,15 @@ class RuleBasedAgent:
                 finance_template(language, "category_spending"),
                 values,
             )
+            if categories.excluded_categories and categories.other_currency_totals:
+                # Disclose rather than convert: no validated exchange rate is available,
+                # so inferring a combined total would invent a financial value.
+                answer = f"{answer} " + finance_template(
+                    language, "other_currency_excluded"
+                ).format(
+                    count=len(categories.excluded_categories),
+                    currencies=", ".join(sorted(categories.other_currency_totals)),
+                )
         else:
             recurring = RecurringSummary.model_validate(data)
             if not recurring.payments:
@@ -464,20 +483,65 @@ def _normalize_remote_result(name: str, data: dict[str, object]) -> dict[str, ob
         groups = data.get("groups")
         if not isinstance(totals, dict) or not totals or not isinstance(groups, list):
             raise ValueError("expense summary is incomplete")
-        currency = str(next(iter(totals)))
+        published = {
+            str(code): amount
+            for code, value in totals.items()
+            if (amount := _decimal_or_none(value)) is not None
+        }
+        if not published:
+            raise ValueError("expense summary has no usable currency totals")
+        # Largest published total wins; sorting first keeps ties deterministic.
+        currency = max(sorted(published), key=lambda code: published[code])
         categories = []
+        excluded = []
         for group in groups:
             if not isinstance(group, dict) or not isinstance(group.get("totals"), dict):
                 continue
-            categories.append(
-                {
-                    "name": str(group.get("key", "Uncategorized")),
-                    "amount": group["totals"].get(currency, 0),
-                }
-            )
+            key = str(group.get("key", "Uncategorized"))
+            amount = _decimal_or_none(group["totals"].get(currency))
+            if amount is None:
+                # Recorded only in another currency. Reporting it as zero would
+                # understate real spending and can misrank the top category.
+                excluded.append(key)
+                continue
+            categories.append({"name": key, "amount": float(amount)})
+        if not categories:
+            raise ValueError(f"expense summary has no {currency} categories")
         return {
             "currency": currency,
             "categories": categories,
+            "other_currency_totals": {
+                code: float(amount)
+                for code, amount in sorted(published.items())
+                if code != currency
+            },
+            "excluded_categories": excluded,
             "as_of": datetime.now(UTC).isoformat(),
         }
     return data
+
+
+def _decimal_or_none(value: object) -> Decimal | None:
+    if value is None or isinstance(value, bool):
+        return None
+    if isinstance(value, int | float | str):
+        try:
+            return Decimal(str(value))
+        except InvalidOperation:
+            return None
+    return None
+
+
+def _resolve_timezone(name: str) -> tzinfo:
+    try:
+        return ZoneInfo(name)
+    except (ZoneInfoNotFoundError, ValueError):
+        return UTC
+
+
+def _current_month_window(timezone: tzinfo) -> tuple[str, str, str]:
+    """Return the current month and its inclusive first/last day in the user's zone."""
+    today = datetime.now(timezone).date()
+    start = today.replace(day=1)
+    end = (start + timedelta(days=32)).replace(day=1) - timedelta(days=1)
+    return f"{start:%Y-%m}", start.isoformat(), end.isoformat()

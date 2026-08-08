@@ -31,6 +31,8 @@ class CategorySummary(BaseModel):
     currency: str
     categories: list[CategorySpending]
     as_of: datetime
+    other_currency_totals: dict[str, Decimal] = Field(default_factory=dict)
+    excluded_categories: list[str] = Field(default_factory=list)
 
 
 class RecurringPayment(BaseModel):
