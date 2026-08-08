@@ -13,6 +13,8 @@ import yaml
 from pydantic import AliasChoices, Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
 
+from manny.i18n import MAJOR_LANGUAGES
+
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 CONFIG_ROOT = REPOSITORY_ROOT / "configs"
 
@@ -59,8 +61,14 @@ class Settings(BaseSettings):
     mcp_tool_timeout_seconds: float = Field(default=30, gt=0, le=120)
     mcp_allowed_tools: str = ""
 
-    stt_backend: str = "mock"
-    tts_backend: str = "mock"
+    stt_backend: Literal["mock", "moonshine", "whisper_cpp"] = "mock"
+    tts_backend: Literal["mock", "kokoro", "espeak_ng"] = "mock"
+    voice_default_language: str = "auto"
+    whisper_cpp_binary: Path = Path("/opt/manny/whisper.cpp/build/bin/whisper-cli")
+    whisper_cpp_model: Path = Path("/opt/manny/models/ggml-base.bin")
+    whisper_cpp_threads: int = Field(default=4, ge=1, le=16)
+    whisper_cpp_timeout_seconds: float = Field(default=90, gt=0, le=300)
+    espeak_ng_binary: Path = Path("/usr/bin/espeak-ng")
     llm_backend: Literal["mock", "llama_cpp"] = "mock"
     llm_base_url: str = "http://127.0.0.1:8080"
     llm_model: str = "gemma-3-1b-it"
@@ -161,6 +169,11 @@ class Settings(BaseSettings):
             },
             "cameraEnabled": self.camera_enabled,
             "faceRecognitionEnabled": self.face_recognition_enabled,
+            "voice": {
+                "defaultLanguage": self.voice_default_language,
+                "majorLanguages": MAJOR_LANGUAGES,
+                "automaticDetection": self.stt_backend == "whisper_cpp",
+            },
         }
 
 

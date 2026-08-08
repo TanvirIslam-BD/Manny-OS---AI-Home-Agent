@@ -23,6 +23,7 @@ All notable changes to Manny OS are documented here.
 - Reset, redaction, security headers, metrics, security CI, and signed-update verification
 - Live MCP-backed device cards, persistent MCP sessions, request coalescing, and verified-data refresh controls
 - Gemma 3 1B IT llama.cpp adapter, short conversational context, schema-validated routing, deterministic fallback, and hardened Pi model service
+- Multilingual text and voice pipeline with BCP-47 metadata, same-language safe finance templates, whisper.cpp automatic STT detection, eSpeak NG output, browser language controls, and Pi installation
 
 ### Security
 

@@ -10,6 +10,7 @@ from mcp.shared.auth import AuthorizationCodeResult
 from pydantic import BaseModel, Field
 
 from manny.agent import AgentQuery, AgentResponse
+from manny.i18n import LANGUAGE_TAG_PATTERN
 from manny.lifecycle import RuntimeServices
 from manny.mcp import MCPStatus
 from manny.reminders import Reminder, ReminderCreate
@@ -35,12 +36,19 @@ class ConnectivityRequest(BaseModel):
 class VoiceSimulationRequest(BaseModel):
     text: str = Field(min_length=1, max_length=500)
     authenticated: bool = False
+    language: str | None = Field(
+        default=None,
+        min_length=2,
+        max_length=35,
+        pattern=rf"^(?:auto|{LANGUAGE_TAG_PATTERN.pattern[1:-1]})$",
+    )
 
 
 class VoiceSimulationResponse(BaseModel):
     transcript: str
     answer: str
     tool_name: str | None = None
+    language: str = "en"
 
 
 class DeviceResetRequest(BaseModel):
@@ -110,6 +118,11 @@ async def connect_mcp(services: Services) -> MCPStatus:
     return await services.mcp.begin_authorization()
 
 
+@router.post("/mcp/switch-account", response_model=MCPStatus)
+async def switch_mcp_account(services: Services) -> MCPStatus:
+    return await services.switch_mcp_account()
+
+
 @router.get("/mcp/oauth/callback")
 async def mcp_oauth_callback(
     services: Services,
@@ -145,7 +158,7 @@ async def simulate_voice(
         raise HTTPException(status_code=409, detail="microphone is muted")
     try:
         result = await services.voice.run_turn(
-            AudioBuffer(pcm=body.text.encode()),
+            AudioBuffer(pcm=body.text.encode(), language_hint=body.language),
             privacy=services.state.snapshot.privacy,
             authenticated=body.authenticated,
         )
@@ -157,6 +170,7 @@ async def simulate_voice(
         transcript=result.transcript.text,
         answer=result.answer,
         tool_name=result.tool_name,
+        language=result.language,
     )
 
 
@@ -204,19 +218,23 @@ async def complete_reminder(reminder_id: str, services: Services) -> None:
 @router.post("/simulator/state", response_model=RuntimeSnapshot)
 async def simulator_state(body: StateRequest, services: Services) -> RuntimeSnapshot:
     _require_simulator(services)
+    camera_disabled = body.state == RuntimeState.CAMERA_DISABLED
     return await services.state.transition(
         body.state,
         force=True,
         message=body.message,
         connected=body.state != RuntimeState.OFFLINE,
-        camera_enabled=body.state != RuntimeState.CAMERA_DISABLED,
+        camera_enabled=not camera_disabled,
         microphone_muted=body.state == RuntimeState.MIC_MUTED,
+        **({"presence": False, "people_count": 0} if camera_disabled else {}),
     )
 
 
 @router.post("/simulator/presence", response_model=RuntimeSnapshot)
 async def simulator_presence(body: PresenceRequest, services: Services) -> RuntimeSnapshot:
     _require_simulator(services)
+    if not services.state.snapshot.camera_enabled:
+        raise HTTPException(status_code=409, detail="camera is disabled")
     camera = services.hardware.camera
     if hasattr(camera, "simulated_people_count"):
         camera.simulated_people_count = body.people_count

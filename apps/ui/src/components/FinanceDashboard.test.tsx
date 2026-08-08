@@ -7,12 +7,12 @@ import type { FinanceDashboardData } from '../types'
 const liveData: FinanceDashboardData = {
   refreshed_at: '2026-08-08T00:00:00Z',
   budget: {
-    answer: 'Budget summary', intent: 'budget_status', tool_name: 'get_budget_status',
+    answer: 'Budget summary', intent: 'budget_status', language: 'en', tool_name: 'get_budget_status',
     requires_authentication: false, requires_confirmation: false,
     data: { currency: 'USD', budget: 1800, spent: 1240, remaining: 560, percent_used: 68.9 },
   },
   spending: {
-    answer: 'Category summary', intent: 'category_spending', tool_name: 'summarize_expenses',
+    answer: 'Category summary', intent: 'category_spending', language: 'en', tool_name: 'summarize_expenses',
     requires_authentication: false, requires_confirmation: false,
     data: { currency: 'USD', categories: [{ name: 'Dining', amount: 458 }] },
   },

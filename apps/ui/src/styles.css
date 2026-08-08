@@ -327,6 +327,7 @@ svg { width: 1.3rem; height: 1.3rem; }
 .mcp-connection__copy p { margin: 3px 0 0; color: #7890a2; font-size: .63rem; line-height: 1.35; }
 .mcp-connection__copy small { display: block; margin-top: 5px; color: #55bea9; font-size: .53rem; }
 .mcp-connection > button { min-height: 34px; padding: 0 12px; color: #06111d; border: 0; border-radius: 9px; background: linear-gradient(135deg, #62dcff, #26efc4); font-size: .62rem; font-weight: 800; cursor: pointer; }
+.mcp-connection > button.mcp-connection__switch { color: #8fe9dc; border: 1px solid rgba(38, 239, 196, .25); background: rgba(38, 239, 196, .06); }
 .mcp-connection > button:disabled { cursor: wait; opacity: .55; }
 .state-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; }
 .state-grid button, .segmented button {
@@ -359,6 +360,9 @@ svg { width: 1.3rem; height: 1.3rem; }
 .error-banner { margin-top: 16px; padding: 12px 14px; color: #ffc6cd; border: 1px solid rgba(255,84,103,.3); border-radius: 10px; background: rgba(72,10,20,.6); font-size: .72rem; }
 .agent-query label { display: block; margin-bottom: 6px; color: #7890a2; font-size: .62rem; }
 .agent-query > div { display: flex; gap: 8px; }
+.agent-query .language-control { margin-bottom: 9px; align-items: center; justify-content: space-between; }
+.agent-query .language-control label { margin: 0; }
+.agent-query select { max-width: 190px; padding: 7px 10px; color: #dbeaf5; border: 1px solid rgba(117,168,204,.18); border-radius: 8px; background: #06111e; }
 .agent-query input { min-width: 0; min-height: 44px; flex: 1; padding: 0 12px; color: #eaf6ff; border: 1px solid rgba(117,168,204,.18); border-radius: 10px; background: #06111e; }
 .agent-query button { padding: 0 16px; color: #06111d; border: 0; border-radius: 10px; background: linear-gradient(135deg, #62dcff, #26efc4); font-size: .68rem; font-weight: 800; }
 .agent-answer { margin-top: 12px; padding: 12px; border: 1px solid rgba(38,239,196,.18); border-radius: 10px; background: rgba(9,39,36,.3); }

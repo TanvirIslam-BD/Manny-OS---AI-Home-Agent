@@ -10,6 +10,7 @@ import {
   setPresence,
   setSimulatorState,
   simulateVoice,
+  switchMcpAccount,
 } from './api/client'
 import FinanceDashboard from './components/FinanceDashboard'
 import CameraPresence from './components/CameraPresence'
@@ -56,6 +57,22 @@ const stateLabels: Partial<Record<RuntimeState, string>> = {
   MIC_MUTED: 'Mic muted', CAMERA_DISABLED: 'Camera off', ERROR: 'Error',
 }
 
+const LANGUAGE_OPTIONS = [
+  ['auto', 'Auto / Automatic'],
+  ['en-US', 'English'],
+  ['bn-BD', 'বাংলা'],
+  ['hi-IN', 'हिन्दी'],
+  ['zh-CN', '中文'],
+  ['ja-JP', '日本語'],
+  ['es-ES', 'Español'],
+  ['fr-FR', 'Français'],
+  ['de-DE', 'Deutsch'],
+  ['ar', 'العربية'],
+  ['pt-BR', 'Português'],
+  ['ru-RU', 'Русский'],
+  ['ko-KR', '한국어'],
+] as const
+
 type DeviceView = 'home' | 'insights' | 'alerts' | 'settings'
 
 function App() {
@@ -66,6 +83,7 @@ function App() {
   const [busy, setBusy] = useState(false)
   const [deviceView, setDeviceView] = useState<DeviceView>('home')
   const [question, setQuestion] = useState('How\'s my budget?')
+  const [language, setLanguage] = useState('auto')
   const [agentResponse, setAgentResponse] = useState<AgentResponse | null>(null)
   const [financeData, setFinanceData] = useState<FinanceDashboardData | null>(null)
   const [financeLoading, setFinanceLoading] = useState(false)
@@ -138,13 +156,37 @@ function App() {
     }
   }
 
+  async function switchMoneyCopilotAccount() {
+    const confirmed = window.confirm(
+      'Switch Money Copilot account? Current authorization and cached finance data will be cleared. Local reminders and settings will be kept.',
+    )
+    if (!confirmed) return
+    setBusy(true)
+    setError(null)
+    try {
+      setFinanceData(null)
+      setFinanceError(null)
+      setAgentResponse(null)
+      const status = await switchMcpAccount()
+      setMcpStatus(status)
+      if (status.authorization_url) window.location.assign(status.authorization_url)
+    } catch (reason) {
+      setError(messageFrom(reason))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   async function submitQuestion(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!question.trim()) return
     setBusy(true)
     setError(null)
     try {
-      setAgentResponse(await askManny(question.trim()))
+      setAgentResponse(await askManny(
+        question.trim(),
+        language === 'auto' ? undefined : language,
+      ))
     } catch (reason) {
       setError(messageFrom(reason))
     } finally {
@@ -157,18 +199,22 @@ function App() {
     setError(null)
     try {
       await pushToTalk()
-      const transcript = await listenOnce()
+      const transcript = await listenOnce(language)
       setQuestion(transcript)
-      const response = await simulateVoice(transcript)
+      const response = await simulateVoice(
+        transcript,
+        language === 'auto' ? undefined : language,
+      )
       setAgentResponse({
         answer: response.answer,
         intent: 'voice',
+        language: response.language,
         tool_name: response.tool_name,
         data: null,
         requires_confirmation: false,
         requires_authentication: false,
       })
-      speak(response.answer)
+      speak(response.answer, response.language)
     } catch (reason) {
       setError(messageFrom(reason))
     } finally {
@@ -282,16 +328,33 @@ function App() {
                   {mcpStatus.phase === 'connecting' ? 'Checking…' : 'Authorize'}
                 </button>
               )}
+              {mcpStatus.phase !== 'mock' && mcpStatus.phase !== 'auth_required' && (
+                <button className="mcp-connection__switch" type="button" disabled={busy} onClick={() => void switchMoneyCopilotAccount()}>
+                  {mcpStatus.connected ? 'Switch account' : 'Use another account'}
+                </button>
+              )}
             </div>
           </section>
 
           <section className="control-group">
             <div className="control-group__title"><span>Talk to Manny</span><small>typed simulation</small></div>
             <form className="agent-query" onSubmit={(event) => void submitQuestion(event)}>
+              <div className="language-control">
+                <label htmlFor="manny-language">Language</label>
+                <select
+                  id="manny-language"
+                  value={language}
+                  onChange={(event) => setLanguage(event.target.value)}
+                >
+                  {LANGUAGE_OPTIONS.map(([value, label]) => (
+                    <option key={value} value={value}>{label}</option>
+                  ))}
+                </select>
+              </div>
               <label htmlFor="manny-question">Question</label>
-              <div><input id="manny-question" value={question} maxLength={500} onChange={(event) => setQuestion(event.target.value)} /><button disabled={busy || !question.trim()} type="submit">Ask</button><button aria-label="Use desktop microphone" disabled={busy || !supportsBrowserVoice()} type="button" onClick={() => void startVoiceTurn()}><Icon name="mic" /></button></div>
+              <div><input dir="auto" id="manny-question" value={question} maxLength={500} onChange={(event) => setQuestion(event.target.value)} /><button disabled={busy || !question.trim()} type="submit">Ask</button><button aria-label="Use desktop microphone" disabled={busy || !supportsBrowserVoice()} type="button" onClick={() => void startVoiceTurn()}><Icon name="mic" /></button></div>
             </form>
-            {agentResponse && <div className="agent-answer" role="status"><strong>Manny</strong><p>{agentResponse.answer}</p>{agentResponse.tool_name && <small>Verified via {agentResponse.tool_name}</small>}</div>}
+            {agentResponse && <div className="agent-answer" role="status"><strong>Manny · {agentResponse.language}</strong><p dir="auto">{agentResponse.answer}</p>{agentResponse.tool_name && <small>Verified via {agentResponse.tool_name}</small>}</div>}
           </section>
 
           <section className="control-group">

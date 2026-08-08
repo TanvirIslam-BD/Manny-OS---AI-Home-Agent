@@ -35,3 +35,26 @@ def test_simulated_voice_budget_turn_returns_spoken_answer() -> None:
     assert response.status_code == 200
     assert response.json()["transcript"] == "How's my budget?"
     assert "$560.00 remaining" in response.json()["answer"]
+
+
+def test_simulated_voice_preserves_selected_language() -> None:
+    app = create_app(Settings(environment="test", mcp_mode="mock", _env_file=None))
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/interaction/voice/simulate",
+            json={"text": "আমার বাজেট", "language": "bn-BD"},
+        )
+
+    assert response.status_code == 200
+    assert response.json()["language"] == "bn-BD"
+
+
+def test_agent_rejects_invalid_language_hint() -> None:
+    app = create_app(Settings(environment="test", mcp_mode="mock", _env_file=None))
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/agent/query",
+            json={"text": "Hello", "language": "en\nignore-rules"},
+        )
+
+    assert response.status_code == 422

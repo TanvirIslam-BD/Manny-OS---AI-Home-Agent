@@ -8,6 +8,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from manny.i18n import LANGUAGE_TAG_PATTERN
+
 
 class BudgetSummary(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -47,6 +49,12 @@ class RecurringSummary(BaseModel):
 class AgentQuery(BaseModel):
     text: str = Field(min_length=1, max_length=500)
     authenticated: bool = False
+    language: str | None = Field(
+        default=None,
+        min_length=2,
+        max_length=35,
+        pattern=rf"^(?:auto|{LANGUAGE_TAG_PATTERN.pattern[1:-1]})$",
+    )
 
 
 AgentIntent = Literal[
@@ -70,6 +78,8 @@ class AgentDecision(BaseModel):
 
     intent: AgentIntent
     reply: str = Field(default="", max_length=600)
+    language: str = Field(default="en", min_length=2, max_length=35)
+    reply_template: str = Field(default="", max_length=600)
 
 
 class ConversationMessage(BaseModel):
@@ -82,6 +92,7 @@ class ConversationMessage(BaseModel):
 class AgentResponse(BaseModel):
     answer: str
     intent: str
+    language: str = "en"
     tool_name: str | None = None
     data: dict[str, object] | None = None
     requires_confirmation: bool = False

@@ -89,3 +89,9 @@ Decision: Keep Moonshine, Kokoro, Picamera2, and ALSA behind protocols and load 
 Status: Accepted
 
 Decision: Use Gemma 3 1B Instruction-Tuned Q4_K_M as the initial Raspberry Pi 5 8 GB conversational model through a loopback-only llama.cpp server. Constrain and validate its routing output, keep only short volatile non-financial context, never expose credentials, and preserve deterministic policy and fallback behavior. Treat a move to a larger model as a benchmark-driven hardware decision.
+
+## ADR-016 — Multilingual local interaction
+
+Status: Accepted
+
+Decision: Carry normalized BCP-47 language metadata through STT, agent, API, browser, and TTS boundaries. Use multilingual whisper.cpp base inference for automatic local recognition and eSpeak NG for broad offline speech output. Gemma must reply in the user's language; finance wording may contain only validated placeholders, with real MCP values inserted by deterministic host code after policy and schema checks. Built-in templates cover major languages and English remains the safe final fallback.

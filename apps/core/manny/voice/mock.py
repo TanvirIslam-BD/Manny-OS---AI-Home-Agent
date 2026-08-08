@@ -1,5 +1,6 @@
 """Deterministic local voice fixtures used by simulator and CI."""
 
+from manny.i18n import detect_text_language
 from manny.voice.models import AudioBuffer, Transcript
 
 
@@ -15,10 +16,14 @@ class MockVoiceActivity:
 
 class MockSpeechToText:
     async def transcribe(self, audio: AudioBuffer) -> Transcript:
-        return Transcript(text=audio.pcm.decode("utf-8", errors="replace").strip())
+        text = audio.pcm.decode("utf-8", errors="replace").strip()
+        return Transcript(
+            text=text,
+            language=detect_text_language(text, audio.language_hint),
+        )
 
 
 class MockTextToSpeech:
-    async def synthesize(self, text: str, voice: str) -> AudioBuffer:
+    async def synthesize(self, text: str, voice: str, language: str) -> AudioBuffer:
         del voice
-        return AudioBuffer(pcm=text.encode("utf-8"))
+        return AudioBuffer(pcm=text.encode("utf-8"), language_hint=language)

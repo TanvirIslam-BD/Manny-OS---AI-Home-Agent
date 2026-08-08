@@ -43,15 +43,23 @@ class HalfDuplexVoiceCoordinator:
             transcript = await self._stt.transcribe(audio)
             await self._state.transition(RuntimeState.THINKING, force=True)
             response = await self._agent.answer(
-                AgentQuery(text=transcript.text, authenticated=authenticated), privacy=privacy
+                AgentQuery(
+                    text=transcript.text,
+                    authenticated=authenticated,
+                    language=transcript.language,
+                ),
+                privacy=privacy,
             )
             await self._state.transition(
                 RuntimeState.SPEAKING, force=True, message=response.answer[:160]
             )
-            spoken = await self._tts.synthesize(response.answer, voice="manny")
+            spoken = await self._tts.synthesize(
+                response.answer, voice="manny", language=response.language
+            )
             return VoiceTurnResult(
                 transcript=transcript,
                 answer=response.answer,
                 audio=spoken,
                 tool_name=response.tool_name,
+                language=response.language,
             )

@@ -9,8 +9,14 @@ api_host: 127.0.0.1
 api_port: 8765
 log_level: INFO
 data_directory: /opt/manny/data
-stt_backend: moonshine
-tts_backend: kokoro
+stt_backend: whisper_cpp
+tts_backend: espeak_ng
+voice_default_language: auto
+whisper_cpp_binary: /opt/manny/whisper.cpp/build/bin/whisper-cli
+whisper_cpp_model: /opt/manny/models/ggml-base.bin
+whisper_cpp_threads: 4
+whisper_cpp_timeout_seconds: 90
+espeak_ng_binary: /usr/bin/espeak-ng
 llm_backend: llama_cpp
 llm_base_url: http://127.0.0.1:8080
 llm_model: gemma-3-1b-it

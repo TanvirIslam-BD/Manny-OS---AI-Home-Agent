@@ -7,6 +7,7 @@ import json
 from collections import deque
 from datetime import UTC, datetime
 from decimal import Decimal
+from string import Formatter
 from typing import Protocol
 
 from manny.agent.models import (
@@ -20,6 +21,7 @@ from manny.agent.models import (
     RecurringSummary,
     is_non_personal_education,
 )
+from manny.i18n import detect_text_language, finance_template, normalize_language_tag
 from manny.policy import PolicyDecision, PolicyEngine, ToolRequest
 from manny.state import PrivacyState
 from manny.storage import FinanceCache
@@ -37,7 +39,10 @@ class IntentModel(Protocol):
     def status(self) -> str: ...
 
     async def decide(
-        self, text: str, history: list[ConversationMessage]
+        self,
+        text: str,
+        history: list[ConversationMessage],
+        language_hint: str | None = None,
     ) -> AgentDecision: ...
 
 
@@ -50,7 +55,21 @@ class DeterministicIntentModel:
         value = text.casefold()
         if is_non_personal_education(text):
             return "general"
-        if "budget" in value:
+        if any(
+            keyword in value
+            for keyword in (
+                "budget",
+                "বাজেট",
+                "बजट",
+                "预算",
+                "予算",
+                "presupuesto",
+                "orçamento",
+                "ميزانية",
+                "бюджет",
+                "예산",
+            )
+        ):
             return "budget_status"
         if any(
             word in value
@@ -67,23 +86,66 @@ class DeterministicIntentModel:
                 "dining",
                 "restaurant",
                 "grocer",
+                "খরচ",
+                "ব্যয়",
+                "खर्च",
+                "支出",
+                "消费",
+                "类别",
+                "使った",
+                "カテゴリー",
+                "gasto",
+                "gastos",
+                "dépense",
+                "ausgabe",
+                "مصروف",
+                "расход",
+                "지출",
             )
         ):
             return "category_spending"
         if any(
             word in value
-            for word in ("recurring", "payment", "upcoming", "subscription", "bill", "due")
+            for word in (
+                "recurring",
+                "payment",
+                "upcoming",
+                "subscription",
+                "bill",
+                "due",
+                "পেমেন্ট",
+                "বিল",
+                "সাবস্ক্রিপশন",
+                "भुगतान",
+                "बिल",
+                "订阅",
+                "账单",
+                "支払い",
+                "請求",
+                "suscripción",
+                "facture",
+                "rechnung",
+                "اشتراك",
+                "счёт",
+                "подписк",
+                "결제",
+                "구독",
+            )
         ):
             return "recurring_payments"
         return "general"
 
     async def decide(
-        self, text: str, history: list[ConversationMessage]
+        self,
+        text: str,
+        history: list[ConversationMessage],
+        language_hint: str | None = None,
     ) -> AgentDecision:
         del history
+        language = detect_text_language(text, language_hint)
         intent = await self.classify(text)
         if intent != "general":
-            return AgentDecision(intent=intent, reply="")
+            return AgentDecision(intent=intent, reply="", language=language)
         value = text.casefold()
         if any(word in value for word in ("hello", "hi", "hey")):
             reply = "Hi! I'm Manny. How can I help around your desk today?"
@@ -94,7 +156,7 @@ class DeterministicIntentModel:
                 "I'm here to chat and help, but my local conversational model is not "
                 "available right now."
             )
-        return AgentDecision(intent="general", reply=reply)
+        return AgentDecision(intent="general", reply=reply, language=language)
 
 
 class ToolBroker:
@@ -169,21 +231,37 @@ class RuleBasedAgent:
     def model_status(self) -> str:
         return self._model.status
 
+    async def clear_context(self) -> None:
+        """Discard account-adjacent conversational context during account changes."""
+        async with self._conversation_lock:
+            self._history.clear()
+
     async def answer(self, query: AgentQuery, *, privacy: PrivacyState) -> AgentResponse:
         remember = privacy in {PrivacyState.PRIVATE_IDLE, PrivacyState.PRESENT_TRUSTED}
         deterministic_intent = await self._fallback_model.classify(query.text)
-        intent: AgentIntent
+        detected_language = detect_text_language(query.text, query.language)
+        model_decision: AgentDecision
         if deterministic_intent != "general":
-            intent = deterministic_intent
+            model_decision = AgentDecision(
+                intent=deterministic_intent,
+                language=detected_language,
+            )
         else:
             async with self._conversation_lock:
                 history = list(self._history) if remember else []
                 try:
-                    model_decision = await self._model.decide(query.text, history)
+                    model_decision = await self._model.decide(
+                        query.text, history, query.language
+                    )
                 except RuntimeError:
-                    model_decision = await self._fallback_model.decide(query.text, history)
-                intent = model_decision.intent
-                if intent == "general":
+                    model_decision = await self._fallback_model.decide(
+                        query.text, history, query.language
+                    )
+                if query.language:
+                    model_decision = model_decision.model_copy(
+                        update={"language": normalize_language_tag(query.language)}
+                    )
+                if model_decision.intent == "general":
                     answer = (
                         model_decision.reply.strip() or "I'm here. What would you like to do?"
                     )
@@ -194,7 +272,17 @@ class RuleBasedAgent:
                                 ConversationMessage(role="assistant", content=answer),
                             )
                         )
-                    return AgentResponse(answer=answer, intent=intent)
+                    return AgentResponse(
+                        answer=answer,
+                        intent=model_decision.intent,
+                        language=normalize_language_tag(
+                            model_decision.language, default=detected_language
+                        ),
+                    )
+        intent = model_decision.intent
+        language = normalize_language_tag(
+            model_decision.language, default=detected_language
+        )
         if self._remote and intent == "recurring_payments":
             return AgentResponse(
                 answer=(
@@ -202,6 +290,7 @@ class RuleBasedAgent:
                     "tool, so I can't provide a verified upcoming-payment list."
                 ),
                 intent=intent,
+                language=language,
             )
         name, arguments = self._tool_for(intent)
         decision, reason, data = await self._broker.call(
@@ -211,17 +300,28 @@ class RuleBasedAgent:
         )
         if decision is PolicyDecision.REQUIRE_AUTHENTICATION:
             return AgentResponse(
-                answer=reason, intent=intent, tool_name=name, requires_authentication=True
+                answer=reason,
+                intent=intent,
+                language=language,
+                tool_name=name,
+                requires_authentication=True,
             )
         if decision is PolicyDecision.REQUIRE_CONFIRMATION:
             return AgentResponse(
-                answer=reason, intent=intent, tool_name=name, requires_confirmation=True
+                answer=reason,
+                intent=intent,
+                language=language,
+                tool_name=name,
+                requires_confirmation=True,
             )
         if decision is PolicyDecision.DENY or data is None:
             return AgentResponse(
-                answer="That tool is not approved on this device.", intent=intent, tool_name=name
+                answer="That tool is not approved on this device.",
+                intent=intent,
+                language=language,
+                tool_name=name,
             )
-        return self._format(intent, name, data)
+        return self._format(model_decision, name, data)
 
     def _tool_for(self, intent: str) -> tuple[str, dict[str, object]]:
         if self._remote:
@@ -241,40 +341,90 @@ class RuleBasedAgent:
         return mock_mapping[intent]
 
     @staticmethod
-    def _format(intent: str, name: str, data: dict[str, object]) -> AgentResponse:
+    def _format(
+        decision: AgentDecision, name: str, data: dict[str, object]
+    ) -> AgentResponse:
+        intent = decision.intent
+        language = normalize_language_tag(decision.language)
         if intent == "budget_status":
             budget = BudgetSummary.model_validate(data)
-            answer = (
-                f"You've spent {_money(budget.spent, budget.currency)} of "
-                f"{_money(budget.budget, budget.currency)}. "
-                f"You have {_money(budget.remaining, budget.currency)} remaining."
+            values = {
+                "spent": _money(budget.spent, budget.currency),
+                "budget": _money(budget.budget, budget.currency),
+                "remaining": _money(budget.remaining, budget.currency),
+            }
+            answer = _render_finance_template(
+                decision.reply_template,
+                finance_template(language, "budget_status"),
+                values,
             )
         elif intent == "category_spending":
             categories = CategorySummary.model_validate(data)
             top = max(categories.categories, key=lambda item: item.amount)
-            answer = (
-                f"{top.name} is your highest category at {_money(top.amount, categories.currency)}."
+            values = {
+                "category": top.name,
+                "amount": _money(top.amount, categories.currency),
+            }
+            answer = _render_finance_template(
+                decision.reply_template,
+                finance_template(language, "category_spending"),
+                values,
             )
         else:
             recurring = RecurringSummary.model_validate(data)
             if not recurring.payments:
-                answer = "You have no upcoming recurring payments in this period."
+                answer = finance_template(language, "no_recurring")
             else:
                 item = min(recurring.payments, key=lambda payment: payment.next_due)
-                amount = _money(item.amount, item.currency)
-                answer = (
-                    f"Your next payment is {item.merchant} at {amount}, due {item.next_due:%B %d}."
+                values = {
+                    "merchant": item.merchant,
+                    "amount": _money(item.amount, item.currency),
+                    "due_date": item.next_due.isoformat(),
+                }
+                answer = _render_finance_template(
+                    decision.reply_template,
+                    finance_template(language, "recurring_payments"),
+                    values,
                 )
         cache_info = data.get("_cache")
         if isinstance(cache_info, dict) and isinstance(cache_info.get("fetched_at"), str):
             fetched_at = cache_info["fetched_at"]
             answer = f"I'm offline. This was last synced at {fetched_at}. {answer}"
-        return AgentResponse(answer=answer, intent=intent, tool_name=name, data=data)
+        return AgentResponse(
+            answer=answer,
+            intent=intent,
+            language=language,
+            tool_name=name,
+            data=data,
+        )
 
 
 def _money(amount: Decimal, currency: str) -> str:
     symbol = "$" if currency == "USD" else f"{currency} "
     return f"{symbol}{amount:,.2f}"
+
+
+def _render_finance_template(
+    candidate: str, fallback: str, values: dict[str, str]
+) -> str:
+    """Render only exact, format-spec-free placeholders after MCP validation."""
+    template = candidate.strip()
+    if template and not any(character.isdecimal() for character in template):
+        try:
+            parsed = list(Formatter().parse(template))
+            fields = {
+                field_name for _, field_name, _, _ in parsed if field_name is not None
+            }
+            safe = fields == set(values) and all(
+                field_name is None
+                or (field_name in values and not format_spec and conversion is None)
+                for _, field_name, format_spec, conversion in parsed
+            )
+            if safe:
+                return template.format(**values)
+        except ValueError:
+            pass
+    return fallback.format(**values)
 
 
 def _cache_key(name: str, arguments: dict[str, object]) -> str:

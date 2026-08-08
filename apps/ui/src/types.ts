@@ -59,6 +59,7 @@ export interface MCPStatus {
 export interface AgentResponse {
   answer: string
   intent: string
+  language: string
   tool_name: string | null
   data: Record<string, unknown> | null
   requires_confirmation: boolean
@@ -75,6 +76,7 @@ export interface VoiceResponse {
   transcript: string
   answer: string
   tool_name: string | null
+  language: string
 }
 
 export type MannyEvent =

@@ -136,15 +136,21 @@ class StateMachine:
         return self._snapshot
 
     async def set_presence(self, people_count: int) -> RuntimeSnapshot:
+        if not self._snapshot.camera_enabled:
+            return self._snapshot
+
         people_count = max(0, people_count)
         present = people_count > 0
-        privacy = (
-            PrivacyState.MULTIPLE_PEOPLE
-            if people_count > 1
-            else PrivacyState.PRESENT_UNKNOWN
-            if present
-            else PrivacyState.PRIVATE_IDLE
-        )
+        if self._snapshot.privacy is PrivacyState.PRIVACY_LOCKED:
+            privacy = PrivacyState.PRIVACY_LOCKED
+        else:
+            privacy = (
+                PrivacyState.MULTIPLE_PEOPLE
+                if people_count > 1
+                else PrivacyState.PRESENT_UNKNOWN
+                if present
+                else PrivacyState.PRIVATE_IDLE
+            )
         target = RuntimeState.PRESENT if present else RuntimeState.IDLE
         return await self.transition(
             target,

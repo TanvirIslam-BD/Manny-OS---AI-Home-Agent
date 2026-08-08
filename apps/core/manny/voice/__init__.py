@@ -7,13 +7,19 @@ from manny.voice.interfaces import (
     VoiceActivityDetector,
     WakeWordDetector,
 )
-from manny.voice.local import KokoroTextToSpeech, MoonshineSpeechToText
+from manny.voice.local import (
+    EspeakTextToSpeech,
+    KokoroTextToSpeech,
+    MoonshineSpeechToText,
+    WhisperCppSpeechToText,
+)
 from manny.voice.mock import MockSpeechToText, MockTextToSpeech, MockVoiceActivity, MockWakeWord
 from manny.voice.models import AudioBuffer, Transcript, VoiceTurnResult
 
 __all__ = [
     "AudioBuffer",
     "HalfDuplexVoiceCoordinator",
+    "EspeakTextToSpeech",
     "KokoroTextToSpeech",
     "MockSpeechToText",
     "MockTextToSpeech",
@@ -26,5 +32,6 @@ __all__ = [
     "VoiceActivityDetector",
     "VoiceBusyError",
     "VoiceTurnResult",
+    "WhisperCppSpeechToText",
     "WakeWordDetector",
 ]

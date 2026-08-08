@@ -53,3 +53,17 @@ def test_mcp_tool_allowlist_is_parsed() -> None:
         "money.get_budget_summary",
         "money.get_transactions",
     }
+
+
+def test_public_settings_advertise_multilingual_voice() -> None:
+    settings = Settings(
+        stt_backend="whisper_cpp",
+        tts_backend="espeak_ng",
+        _env_file=None,
+    )
+
+    voice = settings.public_dict()["voice"]
+
+    assert isinstance(voice, dict)
+    assert voice["automaticDetection"] is True
+    assert voice["majorLanguages"]["bn"] == "বাংলা"

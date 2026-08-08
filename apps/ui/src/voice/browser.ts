@@ -27,7 +27,7 @@ export function supportsBrowserVoice(): boolean {
   return recognitionConstructor() !== undefined && 'speechSynthesis' in window
 }
 
-export function listenOnce(): Promise<string> {
+export function listenOnce(language = 'auto'): Promise<string> {
   const Recognition = recognitionConstructor()
   if (!Recognition) return Promise.reject(new Error('Speech recognition is unavailable'))
   return new Promise((resolve, reject) => {
@@ -35,7 +35,7 @@ export function listenOnce(): Promise<string> {
     let settled = false
     recognition.continuous = false
     recognition.interimResults = false
-    recognition.lang = 'en-US'
+    recognition.lang = language === 'auto' ? navigator.language : language
     recognition.onresult = (event) => {
       settled = true
       resolve(event.results[0][0].transcript)
@@ -52,9 +52,16 @@ export function listenOnce(): Promise<string> {
   })
 }
 
-export function speak(text: string): void {
+export function speak(text: string, language = 'en'): void {
   window.speechSynthesis.cancel()
   const utterance = new SpeechSynthesisUtterance(text)
+  const base = language.toLowerCase().split('-')[0]
+  const voice = window.speechSynthesis.getVoices().find((candidate) => (
+    candidate.lang.toLowerCase() === language.toLowerCase()
+    || candidate.lang.toLowerCase().split('-')[0] === base
+  ))
+  utterance.lang = language
+  if (voice) utterance.voice = voice
   utterance.rate = 1
   window.speechSynthesis.speak(utterance)
 }

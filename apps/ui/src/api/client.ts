@@ -1,7 +1,7 @@
 import type { AgentResponse, FinanceDashboardData, MannyEvent, MCPStatus, RuntimeSnapshot, RuntimeState, VoiceResponse } from '../types'
 
-export async function askManny(text: string): Promise<AgentResponse> {
-  return postJson('/api/agent/query', { text })
+export async function askManny(text: string, language?: string): Promise<AgentResponse> {
+  return postJson('/api/agent/query', { text, language })
 }
 
 export async function getFinanceDashboard(): Promise<FinanceDashboardData> {
@@ -19,8 +19,8 @@ export async function getFinanceDashboard(): Promise<FinanceDashboardData> {
   }
 }
 
-export async function simulateVoice(text: string): Promise<VoiceResponse> {
-  return postJson('/api/interaction/voice/simulate', { text })
+export async function simulateVoice(text: string, language?: string): Promise<VoiceResponse> {
+  return postJson('/api/interaction/voice/simulate', { text, language })
 }
 
 export async function getState(signal?: AbortSignal): Promise<RuntimeSnapshot> {
@@ -49,6 +49,10 @@ export async function getMcpStatus(signal?: AbortSignal): Promise<MCPStatus> {
 
 export async function connectMcp(): Promise<MCPStatus> {
   return postJson('/api/mcp/connect', {})
+}
+
+export async function switchMcpAccount(): Promise<MCPStatus> {
+  return postJson('/api/mcp/switch-account', {})
 }
 
 export function connectEvents(

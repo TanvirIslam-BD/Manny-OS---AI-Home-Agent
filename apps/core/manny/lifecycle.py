@@ -19,12 +19,16 @@ from manny.state import PrivacyState, RuntimeSnapshot, RuntimeState, StateMachin
 from manny.storage import FinanceCache
 from manny.vision import PresenceEvent, VisionService
 from manny.voice import (
+    EspeakTextToSpeech,
     HalfDuplexVoiceCoordinator,
     KokoroTextToSpeech,
     MockSpeechToText,
     MockTextToSpeech,
     MockVoiceActivity,
     MoonshineSpeechToText,
+    SpeechToText,
+    TextToSpeech,
+    WhisperCppSpeechToText,
 )
 
 
@@ -96,6 +100,14 @@ class RuntimeServices:
             privacy=PrivacyState.PRIVACY_LOCKED,
         )
 
+    async def switch_mcp_account(self) -> MCPStatus:
+        """Remove account-specific state and begin a fresh MCP authorization."""
+        await self.mcp.reset_credentials()
+        await self.finance_cache.clear()
+        await self.agent.clear_context()
+        await self.metrics.increment("mcp_account_switches")
+        return await self.mcp.begin_authorization()
+
     async def _on_presence(self, event: PresenceEvent) -> None:
         await self.events.publish("presence.changed", event.model_dump(mode="json"))
 
@@ -159,8 +171,25 @@ def build_services(settings: Settings) -> RuntimeServices:
         model=model,
         max_context_turns=settings.llm_context_turns,
     )
-    stt = MoonshineSpeechToText() if settings.stt_backend == "moonshine" else MockSpeechToText()
-    tts = KokoroTextToSpeech() if settings.tts_backend == "kokoro" else MockTextToSpeech()
+    stt: SpeechToText
+    if settings.stt_backend == "whisper_cpp":
+        stt = WhisperCppSpeechToText(
+            binary=settings.whisper_cpp_binary,
+            model=settings.whisper_cpp_model,
+            threads=settings.whisper_cpp_threads,
+            timeout_seconds=settings.whisper_cpp_timeout_seconds,
+        )
+    elif settings.stt_backend == "moonshine":
+        stt = MoonshineSpeechToText()
+    else:
+        stt = MockSpeechToText()
+    tts: TextToSpeech
+    if settings.tts_backend == "espeak_ng":
+        tts = EspeakTextToSpeech(settings.espeak_ng_binary)
+    elif settings.tts_backend == "kokoro":
+        tts = KokoroTextToSpeech()
+    else:
+        tts = MockTextToSpeech()
     events = EventBus()
     hardware = (
         build_real_hardware(settings)

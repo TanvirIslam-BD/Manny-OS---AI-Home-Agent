@@ -45,6 +45,31 @@ def test_multiple_people_privacy() -> None:
     assert response.json()["privacy"] == "MULTIPLE_PEOPLE"
 
 
+def test_camera_disabled_rejects_presence_and_preserves_privacy_lock() -> None:
+    with build_client() as client:
+        client.post("/api/simulator/presence", json={"people_count": 2})
+        client.post("/api/privacy/lock")
+        disabled = client.post(
+            "/api/simulator/state",
+            json={"state": "CAMERA_DISABLED"},
+        )
+        presence = client.post(
+            "/api/simulator/presence",
+            json={"people_count": 1},
+        )
+        current = client.get("/api/state")
+
+    assert disabled.status_code == 200
+    assert disabled.json()["state"] == "CAMERA_DISABLED"
+    assert disabled.json()["camera_enabled"] is False
+    assert disabled.json()["presence"] is False
+    assert disabled.json()["people_count"] == 0
+    assert disabled.json()["privacy"] == "PRIVACY_LOCKED"
+    assert presence.status_code == 409
+    assert presence.json()["detail"] == "camera is disabled"
+    assert current.json() == disabled.json()
+
+
 def test_offline_health_is_degraded() -> None:
     with build_client() as client:
         client.post("/api/simulator/connectivity", json={"connected": False})
@@ -61,6 +86,17 @@ def test_mock_mcp_status_contains_no_credentials() -> None:
     assert response.status_code == 200
     assert response.json()["phase"] == "mock"
     assert "token" not in response.text.lower()
+
+
+def test_switch_account_clears_account_state_without_factory_reset() -> None:
+    with build_client() as client:
+        response = client.post("/api/mcp/switch-account")
+        metrics = client.get("/api/metrics")
+
+    assert response.status_code == 200
+    assert response.json()["phase"] == "mock"
+    assert "token" not in response.text.lower()
+    assert metrics.json()["mcp_account_switches"] == 1
 
 
 def test_duplicate_oauth_callback_is_idempotent_when_connected() -> None:
