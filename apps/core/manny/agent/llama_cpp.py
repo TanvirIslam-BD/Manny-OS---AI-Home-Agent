@@ -144,6 +144,12 @@ class LlamaCppAgentModel:
             "messages": messages,
             "temperature": 0.2,
             "top_p": 0.9,
+            # A 1B model will loop a token until the cap is reached, which
+            # truncates the JSON and fails validation. Penalise repetition so a
+            # degenerate reply ends instead of running to length.
+            "repeat_penalty": 1.15,
+            "frequency_penalty": 0.5,
+            "presence_penalty": 0.3,
             "max_tokens": self._max_tokens,
             "stream": False,
             "response_format": {
@@ -208,6 +214,12 @@ class LlamaCppAgentModel:
             "messages": messages,
             "temperature": 0.2,
             "top_p": 0.9,
+            # A 1B model will loop a token until the cap is reached, which
+            # truncates the JSON and fails validation. Penalise repetition so a
+            # degenerate reply ends instead of running to length.
+            "repeat_penalty": 1.15,
+            "frequency_penalty": 0.5,
+            "presence_penalty": 0.3,
             "max_tokens": self._max_tokens,
             "stream": False,
             "response_format": {
