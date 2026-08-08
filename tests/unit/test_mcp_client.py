@@ -1,4 +1,5 @@
 from pathlib import Path
+from time import monotonic
 
 import pytest
 from mcp.shared.auth import AuthorizationCodeResult
@@ -55,3 +56,36 @@ async def test_duplicate_oauth_callback_preserves_connected_state(tmp_path: Path
 
     assert status.connected is True
     assert status.phase is MCPConnectionPhase.CONNECTED
+
+
+@pytest.mark.asyncio
+async def test_unreachable_server_fails_fast_instead_of_retrying_every_call() -> None:
+    """A blocked session must not make each question wait out the connect timeout."""
+    from time import perf_counter
+
+    from manny.mcp.client import AuthorizationRequiredError, MoneyCopilotMCPClient
+    from manny.mcp.models import MCPConnectionPhase
+
+    settings = Settings(
+        mcp_mode="remote_http",
+        mcp_url="https://example.invalid/mcp",
+        mcp_allowed_tools="get_budget_status",
+        _env_file=None,
+    )
+    client = MoneyCopilotMCPClient(settings)
+
+    # Authorization is a state a retry cannot fix; it must raise immediately.
+    await client._set_status(MCPConnectionPhase.AUTH_REQUIRED, "authorize")
+    started = perf_counter()
+    with pytest.raises(AuthorizationRequiredError):
+        await client.call_tool("get_budget_status", {})
+    assert perf_counter() - started < 1.0
+
+    # A degraded session retries once, then backs off rather than reconnecting
+    # on every subsequent call.
+    await client._set_status(MCPConnectionPhase.DEGRADED, "unavailable")
+    client._reconnect_after = monotonic() + 30
+    started = perf_counter()
+    with pytest.raises(RuntimeError):
+        await client.call_tool("get_budget_status", {})
+    assert perf_counter() - started < 1.0

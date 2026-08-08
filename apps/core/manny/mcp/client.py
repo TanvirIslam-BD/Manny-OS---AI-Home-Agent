@@ -8,6 +8,7 @@ import logging
 from collections.abc import Awaitable, Callable
 from contextlib import AsyncExitStack
 from pathlib import Path
+from time import monotonic
 
 import httpx2
 from mcp import Client
@@ -23,6 +24,7 @@ from manny.mcp.models import MCPConnectionPhase, MCPStatus
 from manny.mcp.storage import JsonTokenStorage, KeyringTokenStorage
 
 logger = logging.getLogger(__name__)
+_RECONNECT_BACKOFF_SECONDS = 30.0
 StatusListener = Callable[[MCPStatus], Awaitable[None]]
 
 
@@ -85,6 +87,7 @@ class MoneyCopilotMCPClient:
         self._callback_future: asyncio.Future[AuthorizationCodeResult] | None = None
         self._authorization_task: asyncio.Task[None] | None = None
         self._startup_task: asyncio.Task[None] | None = None
+        self._reconnect_after = 0.0
 
     @property
     def status(self) -> MCPStatus:
@@ -173,6 +176,14 @@ class MoneyCopilotMCPClient:
         if name not in self._settings.allowed_mcp_tools:
             raise ToolNotAllowedError(f"MCP tool is not allowlisted: {name}")
         if self._session_client is None:
+            # Reconnecting inline on every call made each question wait out the full
+            # connect timeout before falling back to cache. Fail fast instead when a
+            # retry cannot help, and rate-limit the ones that might.
+            if self._status.phase is MCPConnectionPhase.AUTH_REQUIRED:
+                raise AuthorizationRequiredError("Money Copilot authorization is required")
+            if monotonic() < self._reconnect_after:
+                raise RuntimeError("Money Copilot session is unavailable")
+            self._reconnect_after = monotonic() + _RECONNECT_BACKOFF_SECONDS
             await self._connect(interactive=False)
         client = self._session_client
         if client is None:
@@ -220,6 +231,7 @@ class MoneyCopilotMCPClient:
                     self._session_client = client
                     self._session_stack = active_stack
                     stack = None
+                    self._reconnect_after = 0.0
                     await self._set_status(
                         MCPConnectionPhase.CONNECTED,
                         f"Connected with {len(discovered)} tools discovered",
@@ -239,6 +251,11 @@ class MoneyCopilotMCPClient:
                             MCPConnectionPhase.AUTH_REQUIRED,
                             "Money Copilot account authorization is required",
                         )
+                elif _contains_status(exc, {401, 403}):
+                    await self._set_status(
+                        MCPConnectionPhase.AUTH_REQUIRED,
+                        "Money Copilot account authorization is required",
+                    )
                 elif _contains_exception(exc, AuthorizationRejectedError):
                     await self._set_status(
                         MCPConnectionPhase.ERROR,
@@ -338,6 +355,16 @@ class MoneyCopilotMCPClient:
         if task is not None and not task.done():
             task.cancel()
             await asyncio.gather(task, return_exceptions=True)
+
+
+def _contains_status(exception: BaseException, codes: set[int]) -> bool:
+    """Detect a rejected credential anywhere in a wrapped transport failure."""
+    response = getattr(exception, "response", None)
+    if response is not None and getattr(response, "status_code", None) in codes:
+        return True
+    if isinstance(exception, BaseExceptionGroup):
+        return any(_contains_status(item, codes) for item in exception.exceptions)
+    return False
 
 
 def _contains_exception(exception: BaseException, expected: type[BaseException]) -> bool:
