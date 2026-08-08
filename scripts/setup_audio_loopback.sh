@@ -42,8 +42,19 @@ fi
 if ! modprobe snd-aloop 2>/dev/null; then
   printf 'modprobe snd-aloop failed; installing matching kernel modules...\n' >&2
   apt-get install -y -qq "linux-modules-extra-$(uname -r)" 2>/dev/null || true
-  if ! modprobe snd-aloop; then
-    printf 'Could not load snd-aloop. The audio adapter tests will skip.\n' >&2
+  # A freshly unpacked module stays invisible to modprobe until the dependency
+  # index is rebuilt.
+  depmod -a 2>/dev/null || true
+  if ! modprobe snd-aloop 2>/dev/null; then
+    printf '\nDiagnostics:\n' >&2
+    printf '  kernel: %s\n' "$(uname -r)" >&2
+    if find "/lib/modules/$(uname -r)" -name 'snd-aloop*' -print -quit 2>/dev/null | grep -q .; then
+      printf '  module: present on disk but refused to load\n' >&2
+    else
+      printf '  module: not shipped by this kernel flavour\n' >&2
+    fi
+    printf '\nsnd-aloop is unavailable here; the ALSA adapter tests will skip.\n' >&2
+    printf 'Use a Linux host with a stock kernel, or a self-hosted runner.\n' >&2
     exit 1
   fi
 fi
