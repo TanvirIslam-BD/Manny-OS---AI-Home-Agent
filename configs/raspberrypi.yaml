@@ -18,7 +18,14 @@ whisper_cpp_timeout_seconds: 90
 espeak_ng_binary: /usr/bin/espeak-ng
 llm_backend: llama_cpp
 llm_base_url: http://127.0.0.1:8080
-llm_model: gemma-3-1b-it
+llm_model: gemma-3-4b-it
 llm_timeout_seconds: 60
 llm_max_tokens: 320
 llm_context_turns: 6
+
+# One multimodal model answers text and describes the camera view, so both point
+# at the same llama-server. Measure memory and latency on the device before
+# enabling scene description alongside speech recognition.
+vision_language_backend: llama_cpp
+vision_language_base_url: http://127.0.0.1:8080
+vision_language_model: gemma-3-4b-it

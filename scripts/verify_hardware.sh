@@ -83,7 +83,8 @@ check 'audio capture device' bash -c 'arecord -l | grep -q card'
 check 'audio playback device' bash -c 'aplay -l | grep -q card'
 check 'Chromium kiosk' command -v chromium
 check 'llama.cpp server' test -x /opt/manny/llama.cpp/build/bin/llama-server
-check 'Gemma model' test -r /opt/manny/models/gemma-3-1b-it-Q4_K_M.gguf
+check 'Gemma model' bash -c 'ls /opt/manny/models/gemma-3-*-it-Q4_K_M.gguf >/dev/null 2>&1'
+check 'vision projector (4B multimodal only)' bash -c   'ls /opt/manny/models/gemma-3-4b-it-mmproj-*.gguf >/dev/null 2>&1 || test -r /opt/manny/models/gemma-3-1b-it-Q4_K_M.gguf'
 check 'whisper.cpp CLI' test -x /opt/manny/whisper.cpp/build/bin/whisper-cli
 check 'multilingual Whisper model' test -r /opt/manny/models/ggml-base.bin
 check 'eSpeak NG' command -v espeak-ng
