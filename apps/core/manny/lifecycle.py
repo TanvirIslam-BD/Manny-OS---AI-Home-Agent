@@ -170,6 +170,7 @@ def build_services(settings: Settings) -> RuntimeServices:
         remote=settings.mcp_mode == "remote_http",
         model=model,
         max_context_turns=settings.llm_context_turns,
+        timezone=settings.user_timezone,
     )
     stt: SpeechToText
     if settings.stt_backend == "whisper_cpp":
