@@ -121,6 +121,11 @@ function App() {
       (event) => {
         if (event.type === 'system.state') setSnapshot(event.payload)
         if (event.type === 'mcp.status') setMcpStatus(event.payload)
+        // A reminder can be created by voice or by typing; refresh the list so
+        // the Alerts screen reflects it without a reload.
+        if (event.type === 'notification.created') {
+          getReminders().then(setReminders).catch(() => undefined)
+        }
       },
       setSocketConnected,
     )

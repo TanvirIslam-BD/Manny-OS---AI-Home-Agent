@@ -165,6 +165,17 @@ class RuntimeServices:
             privacy=privacy,
         )
 
+    async def announce_reminder(self, response: object) -> None:
+        """Publish reminders created through conversation.
+
+        The REST route already broadcasts; without this the Alerts screen only
+        learns about a spoken reminder on its next full reload.
+        """
+        data = getattr(response, "data", None)
+        if getattr(response, "intent", None) != "create_reminder" or not isinstance(data, dict):
+            return
+        await self.events.publish("notification.created", data)
+
     async def memory_stats(self) -> MemoryStats:
         return await self.memory.stats()
 

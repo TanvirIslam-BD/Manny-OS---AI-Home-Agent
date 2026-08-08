@@ -186,3 +186,17 @@ def test_brightness_reaches_the_display_adapter() -> None:
     assert rejected.status_code == 422
     # The adapter had no caller before; assert the value actually lands on it.
     assert display.brightness == pytest.approx(0.4)
+
+
+def test_a_spoken_reminder_is_broadcast_to_the_alerts_screen() -> None:
+    with build_client() as client, client.websocket_connect("/api/ws") as websocket:
+        websocket.receive_json()  # opening state frame
+        response = client.post(
+            "/api/agent/query", json={"text": "remind me in 20 minutes to stretch"}
+        )
+        events = [websocket.receive_json() for _ in range(3)]
+
+    assert response.json()["intent"] == "create_reminder"
+    created = [event for event in events if event["type"] == "notification.created"]
+    assert created, "the Alerts screen would not learn about a spoken reminder"
+    assert created[0]["payload"]["title"] == "stretch"

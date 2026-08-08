@@ -132,3 +132,5 @@ export interface VoiceResponse {
 export type MannyEvent =
   | { type: 'system.state'; payload: RuntimeSnapshot }
   | { type: 'mcp.status'; payload: MCPStatus }
+  | { type: 'notification.created'; payload: Record<string, unknown> }
+  | { type: 'presence.changed'; payload: Record<string, unknown> }

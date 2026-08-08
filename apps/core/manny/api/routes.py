@@ -140,6 +140,7 @@ async def agent_query(body: AgentQuery, services: Services) -> AgentResponse:
         else RuntimeState.SPEAKING
     )
     await services.state.transition(target, force=True, message=response.answer[:160])
+    await services.announce_reminder(response)
     return response
 
 
@@ -196,6 +197,7 @@ async def simulate_voice(
         raise HTTPException(status_code=409, detail=str(exc)) from None
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from None
+    await services.announce_reminder(result)
     return VoiceSimulationResponse(
         transcript=result.transcript.text,
         answer=result.answer,

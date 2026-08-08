@@ -36,3 +36,6 @@ class VoiceTurnResult(BaseModel):
     audio: AudioBuffer
     tool_name: str | None = None
     language: str = "en"
+    # Carried so a spoken turn can be announced the same way a typed one is.
+    intent: str = "general"
+    data: dict[str, object] | None = None

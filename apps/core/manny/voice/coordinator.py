@@ -81,4 +81,6 @@ class HalfDuplexVoiceCoordinator:
                 audio=spoken,
                 tool_name=response.tool_name,
                 language=response.language,
+                intent=response.intent,
+                data=response.data,
             )
