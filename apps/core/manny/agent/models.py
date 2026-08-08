@@ -60,6 +60,7 @@ class AgentQuery(BaseModel):
 
 
 AgentIntent = Literal[
+    "describe_scene",
     "create_reminder",
     "budget_status",
     "category_spending",

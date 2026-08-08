@@ -89,6 +89,9 @@ class Settings(BaseSettings):
     voice_vad_threshold: float = Field(default=0.02, gt=0, le=1)
 
     camera_enabled: bool = True
+    vision_language_backend: Literal["none", "llama_cpp"] = "none"
+    vision_language_model: str = "gemma-3-4b-it"
+    vision_language_timeout_seconds: float = Field(default=120, gt=0, le=300)
     person_detector: Literal["none", "opencv_hog"] = "none"
     face_recognition_enabled: bool = False
     quiet_hours_start: str = "22:00"
@@ -202,6 +205,7 @@ class Settings(BaseSettings):
             },
             "presence": {
                 "detector": self.person_detector,
+                "sceneDescription": self.vision_language_backend != "none",
                 "available": self.person_detector != "none",
             },
         }

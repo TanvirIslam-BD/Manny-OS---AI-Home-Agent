@@ -20,7 +20,7 @@ from manny.reminders import ReminderStore
 from manny.security import PasscodeLock
 from manny.state import PrivacyState, RuntimeSnapshot, RuntimeState, StateMachine
 from manny.storage import FinanceCache
-from manny.vision import PresenceEvent, VisionService
+from manny.vision import PresenceEvent, VisionService, build_vision_language_model
 from manny.voice import (
     EnergyVoiceActivity,
     EspeakTextToSpeech,
@@ -265,6 +265,11 @@ def build_services(settings: Settings) -> RuntimeServices:
         if settings.llm_backend == "llama_cpp"
         else None
     )
+    hardware = (
+        build_real_hardware(settings)
+        if settings.hardware_mode == "real"
+        else build_mock_hardware(camera_enabled=settings.camera_enabled)
+    )
     agent = RuleBasedAgent(
         ToolBroker(mcp, PolicyEngine(), finance_cache),
         remote=settings.mcp_mode == "remote_http",
@@ -273,6 +278,13 @@ def build_services(settings: Settings) -> RuntimeServices:
         timezone=settings.user_timezone,
         memory=memory,
         reminders=reminders,
+        camera=hardware.camera,
+        vision_model=build_vision_language_model(
+            settings.vision_language_backend,
+            base_url=settings.llm_base_url,
+            model=settings.vision_language_model,
+            timeout_seconds=settings.vision_language_timeout_seconds,
+        ),
     )
     stt: SpeechToText
     if settings.stt_backend == "whisper_cpp":
@@ -295,11 +307,6 @@ def build_services(settings: Settings) -> RuntimeServices:
     else:
         tts = MockTextToSpeech()
     events = EventBus()
-    hardware = (
-        build_real_hardware(settings)
-        if settings.hardware_mode == "real"
-        else build_mock_hardware(camera_enabled=settings.camera_enabled)
-    )
     vad: VoiceActivityDetector = (
         EnergyVoiceActivity(threshold=settings.voice_vad_threshold)
         if settings.hardware_mode == "real"

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import importlib
+import io
 import logging
 from typing import Any, Protocol, cast
 
@@ -16,6 +17,7 @@ class _Picamera(Protocol):
     def start(self) -> None: ...
     def stop(self) -> None: ...
     def capture_array(self) -> Any: ...
+    def capture_file(self, target: Any, format: str = ...) -> Any: ...
     def create_preview_configuration(self, **kwargs: Any) -> Any: ...
     def configure(self, configuration: Any) -> None: ...
 
@@ -71,6 +73,24 @@ class Picamera2Adapter:
             logger.warning("presence detection failed; reporting no presence")
             self._people_count = 0
         return self._people_count
+
+    async def capture_frame(self) -> bytes | None:
+        """A JPEG for the vision model, encoded in memory and never written out."""
+        if self._camera is None:
+            return None
+        return await asyncio.to_thread(self._capture_frame_sync)
+
+    def _capture_frame_sync(self) -> bytes | None:
+        camera = self._camera
+        if camera is None:
+            return None
+        try:
+            buffer = io.BytesIO()
+            camera.capture_file(buffer, format="jpeg")
+            return buffer.getvalue() or None
+        except Exception:
+            logger.warning("camera frame capture failed")
+            return None
 
     def update_local_detection(self, count: int) -> None:
         """Accept a count from an external detector process."""

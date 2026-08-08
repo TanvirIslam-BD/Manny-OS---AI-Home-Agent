@@ -13,6 +13,8 @@ class MockCamera:
     enabled: bool = True
     running: bool = False
     simulated_people_count: int = 0
+    # A JPEG magic number so backends see plausible bytes without a real camera.
+    simulated_frame: bytes = b"\xff\xd8\xff\xdb simulated frame"
 
     async def start(self) -> None:
         self.running = self.enabled
@@ -22,6 +24,9 @@ class MockCamera:
 
     async def people_count(self) -> int:
         return self.simulated_people_count if self.running else 0
+
+    async def capture_frame(self) -> bytes | None:
+        return self.simulated_frame if self.running else None
 
 
 @dataclass(slots=True)

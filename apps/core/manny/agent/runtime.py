@@ -8,7 +8,7 @@ from collections import deque
 from datetime import UTC, datetime, timedelta, tzinfo
 from decimal import Decimal, InvalidOperation
 from string import Formatter
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from manny.agent.models import (
@@ -30,6 +30,9 @@ from manny.reminders import ReminderCreate, ReminderStore
 from manny.reminders.parsing import parse_due, parse_title
 from manny.state import PrivacyState
 from manny.storage import FinanceCache
+
+if TYPE_CHECKING:  # importing the vision package here would close an import cycle
+    from manny.vision.language import VisionLanguageModel
 
 
 class ToolClient(Protocol):
@@ -60,6 +63,16 @@ class DeterministicIntentModel:
         value = text.casefold()
         if is_non_personal_education(text):
             return "general"
+        if any(
+            keyword in value
+            for keyword in (
+                "what do you see", "what can you see", "look at", "what am i holding",
+                "describe what", "read this", "what is this", "কী দেখছ", "देख रहे हो",
+                "你看到什么", "何が見える", "qué ves", "que vois-tu", "was siehst du",
+                "ماذا ترى", "что ты видишь", "뭐가 보여",
+            )
+        ):
+            return "describe_scene"
         if any(
             keyword in value
             for keyword in (
@@ -236,6 +249,8 @@ class RuleBasedAgent:
         timezone: str = "UTC",
         memory: MemoryStore | None = None,
         reminders: ReminderStore | None = None,
+        camera: object | None = None,
+        vision_model: VisionLanguageModel | None = None,
     ) -> None:
         self._broker = broker
         self._remote = remote
@@ -246,6 +261,8 @@ class RuleBasedAgent:
         self._timezone: tzinfo = _resolve_timezone(timezone)
         self._memory = memory
         self._reminders = reminders
+        self._camera = camera
+        self._vision_model = vision_model
         self._max_context_messages = max_context_turns * 2
 
     async def hydrate(self) -> None:
@@ -340,6 +357,8 @@ class RuleBasedAgent:
         language = normalize_language_tag(
             model_decision.language, default=detected_language
         )
+        if intent == "describe_scene":
+            return await self._describe_scene(query.text, language, privacy)
         if intent == "create_reminder":
             return await self._create_reminder(query.text, language)
         if self._remote and intent == "recurring_payments":
@@ -381,6 +400,45 @@ class RuleBasedAgent:
                 tool_name=name,
             )
         return self._format(model_decision, name, data)
+
+    async def _describe_scene(
+        self, question: str, language: str, privacy: PrivacyState
+    ) -> AgentResponse:
+        """Answer about the current view. The frame is used and dropped."""
+        if privacy in {PrivacyState.MULTIPLE_PEOPLE, PrivacyState.PRIVACY_LOCKED}:
+            # Describing a room aloud while it holds people who have not
+            # unlocked the device is a disclosure, not a convenience.
+            return AgentResponse(
+                answer="I'll keep what I can see private until the session is unlocked.",
+                intent="describe_scene",
+                language=language,
+                requires_authentication=True,
+            )
+        model = self._vision_model
+        configured = model is not None and getattr(model, "status", "") != "disabled"
+        if model is None or not configured or self._camera is None:
+            # No model to send it to, so do not take a picture at all.
+            return AgentResponse(
+                answer="I can see whether someone is here, but I can't describe what I see yet.",
+                intent="describe_scene",
+                language=language,
+            )
+        frame = await self._camera.capture_frame()  # type: ignore[attr-defined]
+        if not frame:
+            return AgentResponse(
+                answer="My camera isn't giving me a picture right now.",
+                intent="describe_scene",
+                language=language,
+            )
+        try:
+            seen = await model.describe(frame, question, language)
+        except RuntimeError:
+            return AgentResponse(
+                answer="I couldn't look at that just now.",
+                intent="describe_scene",
+                language=language,
+            )
+        return AgentResponse(answer=seen.answer, intent="describe_scene", language=language)
 
     async def _create_reminder(self, text: str, language: str) -> AgentResponse:
         """A local write: no external service, no money, reversible by the user."""
