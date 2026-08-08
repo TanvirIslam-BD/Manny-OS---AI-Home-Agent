@@ -65,6 +65,7 @@ class MoneyCopilotMCPClient:
         self._authorization_ready = asyncio.Event()
         self._callback_future: asyncio.Future[AuthorizationCodeResult] | None = None
         self._authorization_task: asyncio.Task[None] | None = None
+        self._startup_task: asyncio.Task[None] | None = None
 
     @property
     def status(self) -> MCPStatus:
@@ -74,16 +75,18 @@ class MoneyCopilotMCPClient:
         self._listener = listener
 
     async def start(self) -> None:
-        await self._connect(interactive=False)
+        if self._startup_task is None or self._startup_task.done():
+            self._startup_task = asyncio.create_task(self._connect(interactive=False))
+            await asyncio.sleep(0)
 
     async def stop(self) -> None:
-        if self._authorization_task and not self._authorization_task.done():
-            self._authorization_task.cancel()
-            await asyncio.gather(self._authorization_task, return_exceptions=True)
+        await self._cancel_task(self._authorization_task)
+        await self._cancel_task(self._startup_task)
 
     async def begin_authorization(self) -> MCPStatus:
         if self._status.connected:
             return self._status
+        await self._cancel_task(self._startup_task)
         if self._authorization_task and not self._authorization_task.done():
             return self._status
 
@@ -101,12 +104,21 @@ class MoneyCopilotMCPClient:
         return self._status
 
     async def complete_authorization(self, result: AuthorizationCodeResult) -> MCPStatus:
+        if self._status.connected:
+            return self._status
+
         future = self._callback_future
         if future is None or future.done():
-            await self._set_status(
-                MCPConnectionPhase.ERROR,
-                "No authorization request is waiting for this callback",
-            )
+            task = self._authorization_task
+            if task is not None and not task.done():
+                try:
+                    async with asyncio.timeout(self._settings.mcp_connect_timeout_seconds):
+                        await asyncio.shield(task)
+                except TimeoutError:
+                    pass
+            if self._status.connected:
+                return self._status
+            await self._connect(interactive=False)
             return self._status
 
         self._authorization_ready.clear()
@@ -277,6 +289,12 @@ class MoneyCopilotMCPClient:
             self._authorization_ready.set()
         if self._listener:
             await self._listener(self._status)
+
+    @staticmethod
+    async def _cancel_task(task: asyncio.Task[None] | None) -> None:
+        if task is not None and not task.done():
+            task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
 
 
 def _contains_exception(exception: BaseException, expected: type[BaseException]) -> bool:

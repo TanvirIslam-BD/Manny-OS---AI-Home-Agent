@@ -69,6 +69,8 @@ async def mcp_oauth_callback(
     iss: str | None = None,
     error: str | None = None,
 ) -> RedirectResponse:
+    if services.mcp.status.connected:
+        return RedirectResponse(url="/?mcp=connected", status_code=303)
     if error or not code:
         await services.mcp.fail_authorization("Money Copilot authorization was cancelled")
         return RedirectResponse(url="/?mcp=error", status_code=303)

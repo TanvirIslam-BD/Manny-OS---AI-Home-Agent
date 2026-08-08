@@ -61,3 +61,14 @@ def test_mock_mcp_status_contains_no_credentials() -> None:
     assert response.status_code == 200
     assert response.json()["phase"] == "mock"
     assert "token" not in response.text.lower()
+
+
+def test_duplicate_oauth_callback_is_idempotent_when_connected() -> None:
+    with build_client() as client:
+        response = client.get(
+            "/api/mcp/oauth/callback?code=duplicate&state=duplicate",
+            follow_redirects=False,
+        )
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/?mcp=connected"

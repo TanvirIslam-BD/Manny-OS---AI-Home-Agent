@@ -49,7 +49,7 @@ class Settings(BaseSettings):
     mcp_url: str = ""
     mcp_protocol_version: str = "2026-07-28"
     mcp_access_token: SecretStr | None = None
-    mcp_connect_timeout_seconds: float = Field(default=30, gt=0, le=60)
+    mcp_connect_timeout_seconds: float = Field(default=45, gt=0, le=60)
     mcp_tool_timeout_seconds: float = Field(default=12, gt=0, le=120)
     mcp_allowed_tools: str = ""
 
