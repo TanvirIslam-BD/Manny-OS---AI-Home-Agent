@@ -22,6 +22,7 @@ function snapshot(state: RuntimeState): RuntimeSnapshot {
     camera_enabled: true,
     listening_enabled: false,
     listening_available: false,
+    language: 'auto',
     status_message: state,
     sequence: 1,
     updated_at: new Date(0).toISOString(),
@@ -80,5 +81,31 @@ describe('DevicePanel', () => {
 
     expect(screen.getByText('3s · speech threshold 0.02')).toBeInTheDocument()
     expect(screen.getByText('opencv_hog')).toBeInTheDocument()
+  })
+})
+
+describe('DevicePanel language selector', () => {
+  it('offers automatic detection alongside the supported languages', () => {
+    render(<DevicePanel view="settings" snapshot={snapshot('IDLE')} mcpConnected busy={false} run={vi.fn()} {...financeProps} />)
+
+    const selector = screen.getByRole('combobox', { name: 'Language' })
+    expect(selector).toHaveValue('auto')
+    expect(screen.getByRole('option', { name: 'Auto detect' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'বাংলা' })).toBeInTheDocument()
+  })
+
+  it('applies the chosen language to the device', () => {
+    const run = vi.fn().mockResolvedValue(undefined)
+    render(<DevicePanel view="settings" snapshot={snapshot('IDLE')} mcpConnected busy={false} run={run} {...financeProps} />)
+
+    fireEvent.change(screen.getByRole('combobox', { name: 'Language' }), { target: { value: 'bn-BD' } })
+    expect(run).toHaveBeenCalledOnce()
+  })
+
+  it('reflects the language already active on the device', () => {
+    const bangla = { ...snapshot('IDLE'), language: 'bn-BD' }
+    render(<DevicePanel view="settings" snapshot={bangla} mcpConnected busy={false} run={vi.fn()} {...financeProps} />)
+
+    expect(screen.getByRole('combobox', { name: 'Language' })).toHaveValue('bn-BD')
   })
 })

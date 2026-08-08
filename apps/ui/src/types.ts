@@ -32,6 +32,7 @@ export interface RuntimeSnapshot {
   camera_enabled: boolean
   listening_enabled: boolean
   listening_available: boolean
+  language: string
   status_message: string
   sequence: number
   updated_at: string

@@ -45,6 +45,10 @@ export async function setListening(enabled: boolean): Promise<RuntimeSnapshot> {
   return postJson('/api/device/listening', { enabled })
 }
 
+export async function setDeviceLanguage(language: string): Promise<RuntimeSnapshot> {
+  return postJson('/api/device/language', { language })
+}
+
 export async function getPublicSettings(signal?: AbortSignal): Promise<PublicSettings> {
   const response = await fetch('/api/settings/public', { signal })
   if (!response.ok) throw new Error(`Settings request failed: ${response.status}`)

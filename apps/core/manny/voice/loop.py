@@ -41,6 +41,10 @@ class VoiceLoop:
         self._language = language
         self._task: asyncio.Task[None] | None = None
 
+    def set_language(self, language: str) -> None:
+        """Change the recognition language without restarting the loop."""
+        self._language = language
+
     async def start(self) -> None:
         if self._task is None or self._task.done():
             self._task = asyncio.create_task(self._run())

@@ -12,6 +12,7 @@ import {
   simulateVoice,
   switchMcpAccount,
   setListening,
+  setDeviceLanguage,
   getPublicSettings,
 } from './api/client'
 import FinanceDashboard from './components/FinanceDashboard'
@@ -31,6 +32,7 @@ const initialState: RuntimeSnapshot = {
   camera_enabled: true,
   listening_enabled: false,
   listening_available: false,
+  language: 'auto',
   status_message: 'Connecting to Manny Core',
   sequence: 0,
   updated_at: new Date().toISOString(),
@@ -87,7 +89,6 @@ function App() {
   const [busy, setBusy] = useState(false)
   const [deviceView, setDeviceView] = useState<DeviceView>('home')
   const [question, setQuestion] = useState('How\'s my budget?')
-  const [language, setLanguage] = useState('auto')
   const [agentResponse, setAgentResponse] = useState<AgentResponse | null>(null)
   const [financeData, setFinanceData] = useState<FinanceDashboardData | null>(null)
   const [financeLoading, setFinanceLoading] = useState(false)
@@ -127,6 +128,8 @@ function App() {
       .finally(() => { if (active) setFinanceLoading(false) })
     return () => { active = false }
   }, [mcpStatus.connected])
+
+  const language = snapshot.language
 
   const greeting = useMemo(() => {
     if (snapshot.state === 'OFFLINE') return 'Connection paused'
@@ -351,7 +354,7 @@ function App() {
                 <select
                   id="manny-language"
                   value={language}
-                  onChange={(event) => setLanguage(event.target.value)}
+                  onChange={(event) => void run(() => setDeviceLanguage(event.target.value))}
                 >
                   {LANGUAGE_OPTIONS.map(([value, label]) => (
                     <option key={value} value={value}>{label}</option>
@@ -457,6 +460,19 @@ export function DevicePanel({
         >
           {snapshot.listening_enabled ? 'Stop always listening' : 'Start always listening'}
         </button>
+        <label className="device-settings__language">
+          <span>Language</span>
+          <select
+            value={snapshot.language}
+            disabled={busy}
+            onChange={(event) => void run(() => setDeviceLanguage(event.target.value))}
+          >
+            <option value="auto">Auto detect</option>
+            {LANGUAGE_OPTIONS.filter(([value]) => value !== 'auto').map(([value, label]) => (
+              <option key={value} value={value}>{label}</option>
+            ))}
+          </select>
+        </label>
         <dl className="device-settings__facts">
           <div>
             <dt>Always listening</dt>
