@@ -31,12 +31,14 @@ class VoiceLoop:
         *,
         chunk_seconds: float = 3.0,
         idle_seconds: float = 0.25,
+        language: str = "auto",
     ) -> None:
         self._microphone = microphone
         self._coordinator = coordinator
         self._state = state
         self._chunk_seconds = chunk_seconds
         self._idle_seconds = idle_seconds
+        self._language = language
         self._task: asyncio.Task[None] | None = None
 
     async def start(self) -> None:
@@ -55,6 +57,10 @@ class VoiceLoop:
         audio = await self._microphone.capture(self._chunk_seconds)
         if not audio.pcm:
             return None
+        if audio.language_hint is None:
+            # Recorders emit raw PCM with no language; carry the configured
+            # preference so recognition is not left guessing on a short chunk.
+            audio = audio.model_copy(update={"language_hint": self._language})
         try:
             return await self._coordinator.run_turn(audio, privacy=snapshot.privacy)
         except (ValueError, VoiceBusyError):

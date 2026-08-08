@@ -210,6 +210,7 @@ def build_services(settings: Settings) -> RuntimeServices:
             model=settings.whisper_cpp_model,
             threads=settings.whisper_cpp_threads,
             timeout_seconds=settings.whisper_cpp_timeout_seconds,
+            default_language=settings.voice_default_language,
         )
     elif settings.stt_backend == "moonshine":
         stt = MoonshineSpeechToText()
@@ -255,6 +256,7 @@ def build_services(settings: Settings) -> RuntimeServices:
                 voice,
                 state,
                 chunk_seconds=settings.voice_capture_seconds,
+                language=settings.voice_default_language,
             )
             if settings.voice_loop_active
             else None
