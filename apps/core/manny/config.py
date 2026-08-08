@@ -73,7 +73,7 @@ class Settings(BaseSettings):
     llm_base_url: str = "http://127.0.0.1:8080"
     llm_model: str = "gemma-3-1b-it"
     llm_timeout_seconds: float = Field(default=60, gt=0, le=180)
-    llm_max_tokens: int = Field(default=192, ge=32, le=512)
+    llm_max_tokens: int = Field(default=320, ge=32, le=512)
     llm_context_turns: int = Field(default=6, ge=1, le=12)
 
     display_width: int | None = Field(default=480, ge=1)
