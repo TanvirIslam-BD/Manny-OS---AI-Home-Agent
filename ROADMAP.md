@@ -1,57 +1,25 @@
 # Manny OS Roadmap
 
-## Phase 0 — Scaffold (current)
+## Software phase status
 
-- [x] Monorepo and development configuration
-- [x] Structured logging and typed settings
-- [x] Authoritative runtime state model
-- [x] Mock hardware adapters
-- [x] FastAPI local service and WebSocket event bus
-- [x] Responsive React/Vite browser simulator
-- [x] Unit and API test infrastructure
-- [x] Development and CI commands
+- [x] Phase 0 — scaffold, configuration, state, mocks, API, simulator, CI
+- [x] Phase 1 — all UI states, pairing, confirmation, settings, accessibility, component tests
+- [x] Phase 2 — mock MCP, policy broker, model seam, typed finance flows
+- [x] Phase 3 — wake/VAD/STT/TTS, Moonshine/Kokoro adapters, half-duplex desktop voice
+- [x] Phase 4 — OAuth remote MCP, schema normalization, keyring storage, offline cache
+- [x] Phase 5 — Picamera2 lifecycle, local presence, desktop camera, multi-person privacy
+- [x] Phase 6 — reminders, scheduler, quiet hours, presence delivery, cooldowns
+- [x] Phase 7 — configurable Pi adapters, systemd, bootstrap, hardware verifier
+- [x] Phase 8 — reset, redaction, metrics, security CI, signed-update workflow
 
-Hardware-backed behavior is not part of this phase.
+## External validation gates
 
-## Phase 1 — UI
+- [ ] Select the final display, camera, microphone, speaker/amplifier, LED controller, controls, and GPIO mapping.
+- [ ] Benchmark Moonshine, Kokoro, the local model, and person detector on Raspberry Pi 5 8 GB.
+- [ ] Run `scripts/verify_hardware.sh` and physical camera/audio/display/privacy tests.
+- [ ] Validate touch, motion, acoustics, wake-word errors, thermal behavior, and power recovery on-device.
+- [ ] Provision the production OS keyring, OAuth policy, Minisign signing key, and public verification key.
+- [ ] Obtain a Money Copilot recurring-payment tool contract. The current server does not advertise one, so Manny refuses to invent that data.
+- [ ] Enable systemd services only after device configuration passes validation.
 
-- [ ] Complete accessibility and touch-target review on the selected display
-- [ ] Confirmation, pairing, and settings screens
-- [ ] Production motion and sound design
-- [ ] Visual regression and component tests
-
-## Phase 2 — Mock MCP + Agent
-
-- [x] Official MCP SDK v2 Streamable HTTP adapter and remote tool discovery
-- [ ] Mock Money Copilot server
-- [ ] Deterministic tool policy and broker
-- [ ] Swappable local model adapter and structured tool loop
-- [ ] Budget, spending, and recurring-payment typed query flows
-
-## Phase 3 — Voice
-
-- [ ] Local wake word, VAD, STT, and TTS adapters
-- [ ] Half-duplex interaction coordinator
-
-## Phase 4 — Real MCP
-
-- [x] OAuth discovery, PKCE authorization, token refresh/storage, and Streamable HTTP connection
-- [ ] Production secure-token adapter and device pairing UX validation
-- [ ] Offline cache and last-sync behavior
-
-## Phase 5 — Vision
-
-- [ ] Picamera2 adapter and local presence detection
-- [ ] Multiple-person privacy behavior
-
-## Phase 6 — Proactive intelligence
-
-- [ ] Deterministic alert scheduler, quiet hours, cooldowns, and reminders
-
-## Phase 7 — Device integration
-
-- [ ] Display, audio, LED, controls, systemd, and Raspberry Pi validation
-
-## Phase 8 — Hardening
-
-- [ ] Secure provisioning, reset, redaction, signed updates, and production tests
+The desktop simulator and automated suites are authoritative until physical and operational gates are available.

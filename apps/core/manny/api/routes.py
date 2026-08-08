@@ -2,16 +2,19 @@
 
 from __future__ import annotations
 
-from typing import Annotated, cast
+from typing import Annotated, Literal, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import RedirectResponse
 from mcp.shared.auth import AuthorizationCodeResult
 from pydantic import BaseModel, Field
 
+from manny.agent import AgentQuery, AgentResponse
 from manny.lifecycle import RuntimeServices
 from manny.mcp import MCPStatus
+from manny.reminders import Reminder, ReminderCreate
 from manny.state import PrivacyState, RuntimeSnapshot, RuntimeState
+from manny.voice import AudioBuffer, VoiceBusyError
 
 router = APIRouter()
 
@@ -29,6 +32,21 @@ class ConnectivityRequest(BaseModel):
     connected: bool
 
 
+class VoiceSimulationRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=500)
+    authenticated: bool = False
+
+
+class VoiceSimulationResponse(BaseModel):
+    transcript: str
+    answer: str
+    tool_name: str | None = None
+
+
+class DeviceResetRequest(BaseModel):
+    confirmation: Literal["RESET MANNY"]
+
+
 def services_from_request(request: Request) -> RuntimeServices:
     return cast(RuntimeServices, request.app.state.services)
 
@@ -39,6 +57,11 @@ Services = Annotated[RuntimeServices, Depends(services_from_request)]
 @router.get("/health")
 async def get_health(services: Services) -> dict[str, object]:
     return services.health()
+
+
+@router.get("/metrics")
+async def get_metrics(services: Services) -> dict[str, int]:
+    return services.metrics.snapshot()
 
 
 @router.get("/state", response_model=RuntimeSnapshot)
@@ -54,6 +77,32 @@ async def get_public_settings(services: Services) -> dict[str, object]:
 @router.get("/mcp/status", response_model=MCPStatus)
 async def get_mcp_status(services: Services) -> MCPStatus:
     return services.mcp.status
+
+
+@router.post("/agent/query", response_model=AgentResponse)
+async def agent_query(body: AgentQuery, services: Services) -> AgentResponse:
+    await services.state.transition(
+        RuntimeState.THINKING, force=True, message="Checking Money Copilot"
+    )
+    try:
+        response = await services.agent.answer(body, privacy=services.state.snapshot.privacy)
+    except RuntimeError as exc:
+        await services.state.transition(
+            RuntimeState.ERROR, force=True, message="I couldn't validate that financial data"
+        )
+        raise HTTPException(status_code=502, detail=str(exc)) from None
+    except ValueError:
+        await services.state.transition(
+            RuntimeState.ERROR, force=True, message="I couldn't validate that financial data"
+        )
+        raise HTTPException(status_code=502, detail="Money Copilot returned invalid data") from None
+    target = (
+        RuntimeState.CONFIRMING
+        if response.requires_confirmation or response.requires_authentication
+        else RuntimeState.SPEAKING
+    )
+    await services.state.transition(target, force=True, message=response.answer[:160])
+    return response
 
 
 @router.post("/mcp/connect", response_model=MCPStatus)
@@ -88,6 +137,29 @@ async def push_to_talk(services: Services) -> RuntimeSnapshot:
     return await services.state.transition(RuntimeState.LISTENING, force=True)
 
 
+@router.post("/interaction/voice/simulate", response_model=VoiceSimulationResponse)
+async def simulate_voice(
+    body: VoiceSimulationRequest, services: Services
+) -> VoiceSimulationResponse:
+    if services.state.snapshot.microphone_muted:
+        raise HTTPException(status_code=409, detail="microphone is muted")
+    try:
+        result = await services.voice.run_turn(
+            AudioBuffer(pcm=body.text.encode()),
+            privacy=services.state.snapshot.privacy,
+            authenticated=body.authenticated,
+        )
+    except VoiceBusyError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from None
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from None
+    return VoiceSimulationResponse(
+        transcript=result.transcript.text,
+        answer=result.answer,
+        tool_name=result.tool_name,
+    )
+
+
 @router.post("/interaction/cancel", response_model=RuntimeSnapshot)
 async def cancel_interaction(services: Services) -> RuntimeSnapshot:
     target = RuntimeState.PRESENT if services.state.snapshot.presence else RuntimeState.IDLE
@@ -102,6 +174,31 @@ async def privacy_lock(services: Services) -> RuntimeSnapshot:
         message="Privacy locked",
         privacy=PrivacyState.PRIVACY_LOCKED,
     )
+
+
+@router.post("/device/reset", response_model=RuntimeSnapshot)
+async def reset_device(body: DeviceResetRequest, services: Services) -> RuntimeSnapshot:
+    del body
+    await services.factory_reset()
+    return services.state.snapshot
+
+
+@router.get("/reminders", response_model=list[Reminder])
+async def list_reminders(services: Services) -> list[Reminder]:
+    return await services.reminders.list()
+
+
+@router.post("/reminders", response_model=Reminder, status_code=201)
+async def create_reminder(body: ReminderCreate, services: Services) -> Reminder:
+    reminder = await services.reminders.create(body)
+    await services.events.publish("notification.created", reminder.model_dump(mode="json"))
+    return reminder
+
+
+@router.post("/reminders/{reminder_id}/complete", status_code=204)
+async def complete_reminder(reminder_id: str, services: Services) -> None:
+    if not await services.reminders.complete(reminder_id):
+        raise HTTPException(status_code=404, detail="reminder not found")
 
 
 @router.post("/simulator/state", response_model=RuntimeSnapshot)

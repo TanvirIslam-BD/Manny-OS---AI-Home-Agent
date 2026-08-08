@@ -1,8 +1,13 @@
 environment: production
 hardware_mode: real
+audio_device: default
 mcp_mode: remote_http
+mcp_token_storage: keyring
 camera_enabled: true
 face_recognition_enabled: false
 api_host: 127.0.0.1
 api_port: 8765
 log_level: INFO
+data_directory: /opt/manny/data
+stt_backend: moonshine
+tts_backend: kokoro

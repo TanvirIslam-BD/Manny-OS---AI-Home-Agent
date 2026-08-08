@@ -1,6 +1,6 @@
 # Manny OS
 
-Manny OS is the application stack for **Manny Copilot**, a stationary AI home and desk assistant powered by Money Copilot AI. This repository currently implements the Phase 0 development scaffold and browser simulator defined by `MANNY_OS_REQUIREMENTS.md`.
+Manny OS is the application stack for **Manny Copilot**, a stationary AI home and desk assistant powered by Money Copilot AI. This repository implements the desktop-simulated software phases in `MANNY_OS_REQUIREMENTS.md`; physical Raspberry Pi validation gates are tracked separately.
 
 ## What works
 
@@ -8,12 +8,13 @@ Manny OS is the application stack for **Manny Copilot**, a stationary AI home an
 - FastAPI service with health, public configuration, runtime state, simulator controls, and a WebSocket event stream
 - Official MCP Python SDK v2 client for Streamable HTTP and OAuth 2.1 account authorization
 - Safe MCP status/tool discovery with an explicit tool allowlist before any tool can execute
+- Live device dashboard populated from validated MCP budget and category summaries, with refresh and offline-cache labels
 - One authoritative, validated application state machine
 - Typed settings loaded from defaults, YAML profiles, and `MANNY_*` environment variables
 - Mock camera, microphone, speaker, LED, and display adapters
 - Unit and API tests that run without Raspberry Pi hardware
 
-All finance values currently shown in the simulator are visibly marked as demo data. Connecting the configured Money Copilot server discovers its tools, but the simulator does not present them as financial truth until the Phase 2 agent and validated finance schemas are implemented.
+The finance display contains no hard-coded amounts. It shows setup/loading/unavailable states until validated MCP data arrives; cached answers disclose their last-sync time.
 
 ## Money Copilot MCP
 
@@ -61,9 +62,9 @@ make test
 make build
 ```
 
-## Current phase
+## Current status
 
-Phase 0 is complete, and the remote MCP connectivity slice is implemented. See [ROADMAP.md](ROADMAP.md) for the agent, validated finance flows, voice, vision, and Raspberry Pi device work that follows.
+The simulator covers UI, agent/MCP, voice, vision, reminders/alerts, device adapters, and hardening. See [ROADMAP.md](ROADMAP.md) for physical hardware, production-key, and upstream recurring-payment contract gates.
 
 ## Safety and privacy
 

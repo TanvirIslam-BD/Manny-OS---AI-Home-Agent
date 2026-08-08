@@ -14,7 +14,7 @@ test:
 	$(PYTHON) -m pytest
 
 lint:
-	$(PYTHON) -m ruff check apps/core tests
+	$(PYTHON) -m ruff check apps/core mcp_servers tests
 	cd apps/ui && $(NPM) run lint
 
 typecheck:
@@ -28,13 +28,13 @@ run:
 	$(PYTHON) -m uvicorn manny.main:app --app-dir apps/core --host 127.0.0.1 --port 8765 --no-access-log
 
 mock-mcp:
-	@echo "Mock Money Copilot MCP is planned for Phase 2."
+	$(PYTHON) -m mcp_servers.manny_local.server
 
 build:
 	cd apps/ui && $(NPM) run build
 
 install-pi:
-	@echo "Raspberry Pi installation is planned for Phase 7."
+	./scripts/bootstrap_pi.sh
 
 health:
 	$(PYTHON) scripts/health.py

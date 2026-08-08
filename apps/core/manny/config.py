@@ -39,18 +39,23 @@ class Settings(BaseSettings):
     config_profile: str = "development"
     device_id: str = "dev-manny"
     user_timezone: str = "UTC"
+    data_directory: Path = REPOSITORY_ROOT / "data"
 
     api_host: str = "127.0.0.1"
     api_port: int = Field(default=8765, ge=1024, le=65535)
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"
 
     hardware_mode: Literal["mock", "real"] = "mock"
+    audio_device: str | None = None
+    led_state_path: Path | None = None
+    display_brightness_path: Path | None = None
     mcp_mode: Literal["mock", "remote_http", "local_stdio", "local_http"] = "mock"
     mcp_url: str = ""
     mcp_protocol_version: str = "2026-07-28"
     mcp_access_token: SecretStr | None = None
+    mcp_token_storage: Literal["json", "keyring"] = "json"
     mcp_connect_timeout_seconds: float = Field(default=45, gt=0, le=60)
-    mcp_tool_timeout_seconds: float = Field(default=12, gt=0, le=120)
+    mcp_tool_timeout_seconds: float = Field(default=30, gt=0, le=120)
     mcp_allowed_tools: str = ""
 
     stt_backend: str = "mock"
@@ -111,6 +116,12 @@ class Settings(BaseSettings):
                 raise ValueError("MANNY_MCP_URL is required for remote_http mode")
             if not self.mcp_url.startswith("https://"):
                 raise ValueError("remote MCP connections require HTTPS")
+        if self.environment == "production" and self.mcp_token_storage != "keyring":
+            raise ValueError("production requires OS keyring token storage")
+        if self.hardware_mode == "real" and not self.audio_device:
+            raise ValueError("real hardware mode requires MANNY_AUDIO_DEVICE")
+        if not self.data_directory.is_absolute():
+            raise ValueError("MANNY_DATA_DIRECTORY must be an absolute path")
         return self
 
     @property

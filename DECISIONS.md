@@ -65,3 +65,21 @@ Decision: V1 will not expose payment, transfer, trading, credit, or bank-credent
 Status: Accepted
 
 Decision: Use the official MCP Python SDK v2 for the 2026-07-28 protocol over Streamable HTTP. Protected remote servers use OAuth discovery, PKCE, dynamic registration, and explicit browser authorization. Discovered tools remain non-callable until their names are placed in the deterministic allowlist.
+
+## ADR-012 — Semantic finance normalization
+
+Status: Accepted
+
+Decision: Normalize provider-specific structured results into Manny's typed semantic models inside the host broker. Unsupported semantics are reported unavailable rather than inferred from unrelated tools.
+
+## ADR-013 — Local persistence and credentials
+
+Status: Accepted
+
+Decision: Store reminders and minimal timestamped finance cache in SQLite. Development OAuth data uses an ignored restrictive file; production requires an OS keyring.
+
+## ADR-014 — Optional local media runtimes
+
+Status: Accepted
+
+Decision: Keep Moonshine, Kokoro, Picamera2, and ALSA behind protocols and load them only in configured device modes so desktop development and CI stay deterministic.

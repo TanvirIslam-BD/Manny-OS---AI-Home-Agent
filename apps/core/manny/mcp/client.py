@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import asyncio
+import importlib
 import logging
 from collections.abc import Awaitable, Callable
+from contextlib import AsyncExitStack
 from pathlib import Path
 
 import httpx2
@@ -18,7 +20,7 @@ from pydantic import AnyUrl
 from manny import __version__
 from manny.config import REPOSITORY_ROOT, Settings
 from manny.mcp.models import MCPConnectionPhase, MCPStatus
-from manny.mcp.storage import JsonTokenStorage
+from manny.mcp.storage import JsonTokenStorage, KeyringTokenStorage
 
 logger = logging.getLogger(__name__)
 StatusListener = Callable[[MCPStatus], Awaitable[None]]
@@ -53,15 +55,32 @@ class MoneyCopilotMCPClient:
                 access_token=settings.mcp_access_token.get_secret_value(),
                 scope="mcp:tools mcp:resources mcp:prompts",
             )
-        self._storage = JsonTokenStorage(
-            storage_path or REPOSITORY_ROOT / "data" / "mcp_oauth.json",
-            initial_token=initial_token,
-        )
+        self._storage: JsonTokenStorage | KeyringTokenStorage
+        if settings.mcp_token_storage == "keyring":
+            try:
+                keyring = importlib.import_module("keyring")
+            except ImportError as exc:
+                raise RuntimeError("install Manny's production keyring dependency") from exc
+            methods = ("get_password", "set_password", "delete_password")
+            if not all(hasattr(keyring, name) for name in methods):
+                raise RuntimeError("installed keyring backend is incompatible")
+            self._storage = KeyringTokenStorage(
+                keyring,
+                device_id=settings.device_id,
+            )
+        else:
+            self._storage = JsonTokenStorage(
+                storage_path or REPOSITORY_ROOT / "data" / "mcp_oauth.json",
+                initial_token=initial_token,
+            )
         self._status = MCPStatus(
             phase=MCPConnectionPhase.CONNECTING,
             detail="Checking Money Copilot connection",
         )
         self._connection_lock = asyncio.Lock()
+        self._tool_lock = asyncio.Lock()
+        self._session_client: Client | None = None
+        self._session_stack: AsyncExitStack | None = None
         self._authorization_ready = asyncio.Event()
         self._callback_future: asyncio.Future[AuthorizationCodeResult] | None = None
         self._authorization_task: asyncio.Task[None] | None = None
@@ -82,6 +101,15 @@ class MoneyCopilotMCPClient:
     async def stop(self) -> None:
         await self._cancel_task(self._authorization_task)
         await self._cancel_task(self._startup_task)
+        await self._close_session()
+
+    async def reset_credentials(self) -> None:
+        await self.stop()
+        await self._storage.clear()
+        await self._set_status(
+            MCPConnectionPhase.AUTH_REQUIRED,
+            "Money Copilot account authorization is required",
+        )
 
     async def begin_authorization(self) -> MCPStatus:
         if self._status.connected:
@@ -144,55 +172,61 @@ class MoneyCopilotMCPClient:
     async def call_tool(self, name: str, arguments: dict[str, object]) -> CallToolResult:
         if name not in self._settings.allowed_mcp_tools:
             raise ToolNotAllowedError(f"MCP tool is not allowlisted: {name}")
-        provider = self._oauth_provider(interactive=False)
-        async with asyncio.timeout(self._settings.mcp_tool_timeout_seconds):
-            async with httpx2.AsyncClient(auth=provider, follow_redirects=True) as http_client:
-                transport = streamable_http_client(self._settings.mcp_url, http_client=http_client)
-                async with Client(
-                    transport,
-                    mode="auto",
-                    read_timeout_seconds=self._settings.mcp_tool_timeout_seconds,
-                    client_info=Implementation(name="manny-os", version=__version__),
-                ) as client:
-                    return await client.call_tool(name, arguments)
+        if self._session_client is None:
+            await self._connect(interactive=False)
+        client = self._session_client
+        if client is None:
+            raise RuntimeError("Money Copilot session is unavailable")
+        async with self._tool_lock:
+            async with asyncio.timeout(self._settings.mcp_tool_timeout_seconds):
+                return await client.call_tool(name, arguments)
 
     async def _connect(self, *, interactive: bool) -> None:
         async with self._connection_lock:
+            await self._close_session()
             await self._set_status(MCPConnectionPhase.CONNECTING, "Connecting to Money Copilot")
             provider = self._oauth_provider(interactive=interactive)
+            active_stack = AsyncExitStack()
+            stack: AsyncExitStack | None = active_stack
+            await active_stack.__aenter__()
             try:
                 async with asyncio.timeout(
                     None if interactive else self._settings.mcp_connect_timeout_seconds
                 ):
-                    async with httpx2.AsyncClient(
-                        auth=provider,
-                        follow_redirects=True,
-                        timeout=self._settings.mcp_connect_timeout_seconds,
-                    ) as http_client:
-                        transport = streamable_http_client(
-                            self._settings.mcp_url,
-                            http_client=http_client,
+                    http_client = await active_stack.enter_async_context(
+                        httpx2.AsyncClient(
+                            auth=provider,
+                            follow_redirects=True,
+                            timeout=self._settings.mcp_connect_timeout_seconds,
                         )
-                        async with Client(
+                    )
+                    transport = streamable_http_client(
+                        self._settings.mcp_url,
+                        http_client=http_client,
+                    )
+                    client = await active_stack.enter_async_context(
+                        Client(
                             transport,
                             mode="auto",
                             read_timeout_seconds=self._settings.mcp_connect_timeout_seconds,
                             client_info=Implementation(name="manny-os", version=__version__),
-                        ) as client:
-                            tools = await client.list_tools()
-                            discovered = sorted(tool.name for tool in tools.tools)
-                            server_name = (
-                                client.server_info.name
-                                if client.server_info
-                                else "Money Copilot MCP"
-                            )
-                            await self._set_status(
-                                MCPConnectionPhase.CONNECTED,
-                                f"Connected with {len(discovered)} tools discovered",
-                                server_name=server_name,
-                                protocol_version=client.protocol_version,
-                                discovered_tools=discovered,
-                            )
+                        )
+                    )
+                    tools = await client.list_tools()
+                    discovered = sorted(tool.name for tool in tools.tools)
+                    server_name = (
+                        client.server_info.name if client.server_info else "Money Copilot MCP"
+                    )
+                    self._session_client = client
+                    self._session_stack = active_stack
+                    stack = None
+                    await self._set_status(
+                        MCPConnectionPhase.CONNECTED,
+                        f"Connected with {len(discovered)} tools discovered",
+                        server_name=server_name,
+                        protocol_version=client.protocol_version,
+                        discovered_tools=discovered,
+                    )
             except TimeoutError:
                 await self._set_status(
                     MCPConnectionPhase.DEGRADED,
@@ -216,6 +250,15 @@ class MoneyCopilotMCPClient:
                         MCPConnectionPhase.DEGRADED,
                         "Money Copilot is unavailable or authorization was rejected",
                     )
+            finally:
+                if stack is not None:
+                    await stack.aclose()
+
+    async def _close_session(self) -> None:
+        stack, self._session_stack = self._session_stack, None
+        self._session_client = None
+        if stack is not None:
+            await stack.aclose()
 
     def _oauth_provider(self, *, interactive: bool) -> OAuthClientProvider:
         redirect_uri = AnyUrl(

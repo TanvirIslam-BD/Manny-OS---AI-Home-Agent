@@ -1,19 +1,21 @@
-# Phase 0 Architecture
-
-The browser simulator communicates only with Manny Core's localhost REST and WebSocket API. Manny Core owns the authoritative state machine and controls hardware through interfaces. Phase 0 injects in-memory mock adapters, so the same runtime can execute on Windows, macOS, Linux, and CI.
+# Manny OS Architecture
 
 ```text
-React/Vite simulator
-       | REST + WebSocket
-       v
-FastAPI localhost service
-       |
-       +-- authoritative state machine
-       +-- in-process event bus
-       +-- typed configuration
-       +-- hardware protocols
-                 |
-                 +-- mock camera/audio/LED/display
+React/Vite display + desktop camera/microphone simulation
+                     | REST + WebSocket
+                     v
+FastAPI localhost host runtime
+  |-- authoritative state and privacy machine
+  |-- half-duplex voice coordinator
+  |-- swappable local intent, STT, and TTS adapters
+  |-- deterministic policy and tool broker
+  |-- official SDK MCP client and contract normalization
+  |-- timestamped finance cache
+  |-- presence and notification schedulers
+  |-- reminders in SQLite
+  `-- mockable camera/audio/LED/display adapters
 ```
 
-Money Copilot MCP and the tool-using agent are intentionally introduced in Phase 2. Current financial truth must never originate from the Phase 0 UI fixture.
+Financial values enter through validated MCP structured results or timestamped cache. The official client keeps the authenticated MCP session open, while the broker coalesces duplicate dashboard requests and reuses fresh verified results. The model never receives OAuth credentials and cannot execute tools directly. Remote output is treated as untrusted data and normalized into local Pydantic contracts before presentation; the device UI has no hard-coded finance amounts.
+
+Development injects deterministic fixtures. Raspberry Pi mode injects configurable Picamera2, ALSA, sysfs LED/display, Moonshine, and Kokoro adapters without fixed device identifiers.

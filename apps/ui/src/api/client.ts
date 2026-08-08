@@ -1,4 +1,27 @@
-import type { MannyEvent, MCPStatus, RuntimeSnapshot, RuntimeState } from '../types'
+import type { AgentResponse, FinanceDashboardData, MannyEvent, MCPStatus, RuntimeSnapshot, RuntimeState, VoiceResponse } from '../types'
+
+export async function askManny(text: string): Promise<AgentResponse> {
+  return postJson('/api/agent/query', { text })
+}
+
+export async function getFinanceDashboard(): Promise<FinanceDashboardData> {
+  const [budget, spending] = await Promise.allSettled([
+    askManny("How's my budget?"),
+    askManny('Show my spending by category'),
+  ])
+  if (budget.status === 'rejected' && spending.status === 'rejected') {
+    throw budget.reason instanceof Error ? budget.reason : new Error('Money data is unavailable')
+  }
+  return {
+    budget: budget.status === 'fulfilled' ? budget.value : null,
+    spending: spending.status === 'fulfilled' ? spending.value : null,
+    refreshed_at: new Date().toISOString(),
+  }
+}
+
+export async function simulateVoice(text: string): Promise<VoiceResponse> {
+  return postJson('/api/interaction/voice/simulate', { text })
+}
 
 export async function getState(signal?: AbortSignal): Promise<RuntimeSnapshot> {
   const response = await fetch('/api/state', { signal })

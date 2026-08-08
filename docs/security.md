@@ -1,3 +1,13 @@
 # Security Architecture
 
-The local API binds to loopback, public settings omit MCP endpoints and credentials, and hardware access is isolated behind adapters. MCP OAuth tokens stay in the host runtime and are never exposed to browser JavaScript or agent context. Raw HTTP access logs are disabled so the OAuth callback's short-lived authorization code is not recorded. Development storage uses a Git-ignored restrictive file; production secure storage, reset, broader log-redaction verification, and signed updates remain tracked for hardening.
+- API is loopback-only and emits CSP, anti-framing, no-sniff, no-referrer, and no-store headers.
+- Browser code never receives MCP credentials.
+- Development OAuth data uses an ignored mode-0600 file; production requires the OS keyring.
+- Logs redact bearer credentials, OAuth codes/state, tokens, and client secrets; access logs are disabled.
+- Tool calls are deny-by-default, allowlisted, schema-validated, and policy-evaluated.
+- Unknown or multiple people cannot receive private finance results without authentication.
+- Factory reset requires the exact phrase, clears OAuth/cache/reminders, and returns to locked pairing.
+- CI scans secrets, audits dependencies, and runs test/build gates.
+- Release archives carry SHA-256 checksums. Production requires Minisign signing and verification before installation.
+
+Operators provision keyring and signing keys outside Git and validate the selected backend on the target OS.

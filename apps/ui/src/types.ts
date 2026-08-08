@@ -56,6 +56,27 @@ export interface MCPStatus {
   checked_at: string
 }
 
+export interface AgentResponse {
+  answer: string
+  intent: string
+  tool_name: string | null
+  data: Record<string, unknown> | null
+  requires_confirmation: boolean
+  requires_authentication: boolean
+}
+
+export interface FinanceDashboardData {
+  budget: AgentResponse | null
+  spending: AgentResponse | null
+  refreshed_at: string
+}
+
+export interface VoiceResponse {
+  transcript: string
+  answer: string
+  tool_name: string | null
+}
+
 export type MannyEvent =
   | { type: 'system.state'; payload: RuntimeSnapshot }
   | { type: 'mcp.status'; payload: MCPStatus }
