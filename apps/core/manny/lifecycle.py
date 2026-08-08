@@ -17,6 +17,7 @@ from manny.notifications import AlertEngine, Notification, NotificationScheduler
 from manny.observability import MetricsRegistry
 from manny.policy import PolicyEngine
 from manny.reminders import ReminderStore
+from manny.security import PasscodeLock
 from manny.state import PrivacyState, RuntimeSnapshot, RuntimeState, StateMachine
 from manny.storage import FinanceCache
 from manny.vision import PresenceEvent, VisionService
@@ -49,6 +50,7 @@ class RuntimeServices:
     voice_loop: VoiceLoop | None
     finance_cache: FinanceCache
     memory: MemoryStore
+    security: PasscodeLock
     vision: VisionService
     reminders: ReminderStore
     alerts: AlertEngine
@@ -138,6 +140,30 @@ class RuntimeServices:
         )
         await self.events.publish("mcp.status", status.model_dump(mode="json"))
 
+    async def apply_unlock_state(self) -> RuntimeSnapshot:
+        """Reflect the unlock session in privacy state.
+
+        PRESENT_TRUSTED had no producer before this: presence alone can only say
+        that somebody is there, never that they are the account holder. A verified
+        passcode is what promotes the session, which is also what lets private
+        reminders be delivered at all.
+        """
+        snapshot = self.state.snapshot
+        if self.security.is_unlocked():
+            privacy = PrivacyState.PRESENT_TRUSTED
+        elif snapshot.people_count > 1:
+            privacy = PrivacyState.MULTIPLE_PEOPLE
+        elif snapshot.presence:
+            privacy = PrivacyState.PRESENT_UNKNOWN
+        else:
+            privacy = PrivacyState.PRIVATE_IDLE
+        return await self.state.transition(
+            snapshot.state,
+            force=True,
+            message=snapshot.status_message,
+            privacy=privacy,
+        )
+
     async def memory_stats(self) -> MemoryStats:
         return await self.memory.stats()
 
@@ -150,6 +176,7 @@ class RuntimeServices:
         await self.mcp.reset_credentials()
         await self.finance_cache.clear()
         await self.agent.forget()
+        await self.security.clear()
         await self.reminders.clear()
         await self.metrics.increment("device_resets")
         await self.state.transition(
@@ -210,6 +237,7 @@ def build_services(settings: Settings) -> RuntimeServices:
     state = StateMachine(RuntimeSnapshot(camera_enabled=settings.camera_enabled))
     finance_cache = FinanceCache(settings.data_directory / "finance_cache.sqlite3")
     memory = MemoryStore(settings.data_directory / "memory.sqlite3")
+    security = PasscodeLock(settings.data_directory / "passcode.json")
     reminders = ReminderStore(settings.data_directory / "manny.sqlite3")
     alerts = AlertEngine(
         time.fromisoformat(settings.quiet_hours_start),
@@ -293,6 +321,7 @@ def build_services(settings: Settings) -> RuntimeServices:
         ),
         finance_cache=finance_cache,
         memory=memory,
+        security=security,
         vision=VisionService(
             hardware.camera,
             state,

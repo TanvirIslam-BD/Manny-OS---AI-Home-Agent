@@ -62,6 +62,14 @@ export interface PublicSettings {
   }
 }
 
+export interface SecurityStatus {
+  passcode_set: boolean
+  unlocked: boolean
+  attempts_remaining: number
+  locked_out_until: string | null
+  unlocked_until: string | null
+}
+
 export interface MemoryStats {
   entries: number
   limit: number

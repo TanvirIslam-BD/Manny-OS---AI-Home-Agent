@@ -132,3 +132,41 @@ def test_device_language_is_applied_and_broadcast() -> None:
     assert current.json()["language"] == "bn-BD"
     assert auto.json()["language"] == "auto"
     assert rejected.status_code == 422
+
+
+def test_client_cannot_assert_authentication_to_bypass_the_privacy_gate() -> None:
+    with build_client() as client:
+        client.post("/api/simulator/presence", json={"people_count": 2})
+        spoofed = client.post(
+            "/api/agent/query",
+            json={"text": "How is my budget?", "authenticated": True},
+        )
+
+    # The flag is advisory; only a verified unlock session may open the gate.
+    assert spoofed.status_code == 200
+    assert spoofed.json()["requires_authentication"] is True
+
+
+def test_passcode_unlock_opens_the_gate_and_locking_closes_it() -> None:
+    with build_client() as client:
+        client.post("/api/simulator/presence", json={"people_count": 2})
+        blocked = client.post("/api/agent/query", json={"text": "How is my budget?"})
+
+        client.post("/api/security/passcode", json={"passcode": "246813"})
+        client.post("/api/security/lock")
+        rejected = client.post("/api/security/unlock", json={"passcode": "000000"})
+        unlocked = client.post("/api/security/unlock", json={"passcode": "246813"})
+        state = client.get("/api/state")
+        allowed = client.post("/api/agent/query", json={"text": "How is my budget?"})
+
+        client.post("/api/security/lock")
+        relocked = client.post("/api/agent/query", json={"text": "How is my budget?"})
+
+    assert blocked.json()["requires_authentication"] is True
+    assert rejected.status_code == 401
+    assert unlocked.json()["unlocked"] is True
+    # A verified session is the only producer of PRESENT_TRUSTED.
+    assert state.json()["privacy"] == "PRESENT_TRUSTED"
+    assert allowed.json()["requires_authentication"] is False
+    assert "spent" in allowed.json()["answer"].casefold()
+    assert relocked.json()["requires_authentication"] is True

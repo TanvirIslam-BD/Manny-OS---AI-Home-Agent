@@ -15,6 +15,7 @@ from manny.lifecycle import RuntimeServices
 from manny.mcp import MCPStatus
 from manny.memory import MemoryStats
 from manny.reminders import Reminder, ReminderCreate
+from manny.security import LockedOutError, PasscodeError, SecurityStatus
 from manny.state import PrivacyState, RuntimeSnapshot, RuntimeState
 from manny.voice import AudioBuffer, VoiceBusyError
 
@@ -64,6 +65,15 @@ class LanguageRequest(BaseModel):
     )
 
 
+class PasscodeRequest(BaseModel):
+    passcode: str = Field(min_length=4, max_length=12)
+    current_passcode: str | None = Field(default=None, min_length=4, max_length=12)
+
+
+class UnlockRequest(BaseModel):
+    passcode: str = Field(min_length=4, max_length=12)
+
+
 class DeviceResetRequest(BaseModel):
     confirmation: Literal["RESET MANNY"]
 
@@ -106,7 +116,10 @@ async def agent_query(body: AgentQuery, services: Services) -> AgentResponse:
         RuntimeState.THINKING, force=True, message="Checking Money Copilot"
     )
     try:
-        response = await services.agent.answer(body, privacy=services.state.snapshot.privacy)
+        # `authenticated` from the caller is advisory only. Anything able to reach
+        # the loopback API could set it, so the verified unlock session decides.
+        query = body.model_copy(update={"authenticated": services.security.is_unlocked()})
+        response = await services.agent.answer(query, privacy=services.state.snapshot.privacy)
     except RuntimeError as exc:
         await services.state.transition(
             RuntimeState.ERROR, force=True, message="I couldn't validate that financial data"
@@ -173,7 +186,7 @@ async def simulate_voice(
         result = await services.voice.run_turn(
             AudioBuffer(pcm=body.text.encode(), language_hint=body.language),
             privacy=services.state.snapshot.privacy,
-            authenticated=body.authenticated,
+            authenticated=services.security.is_unlocked(),
         )
     except VoiceBusyError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from None
@@ -213,6 +226,40 @@ async def set_listening(body: ListeningRequest, services: Services) -> RuntimeSn
 @router.post("/device/language", response_model=RuntimeSnapshot)
 async def set_language(body: LanguageRequest, services: Services) -> RuntimeSnapshot:
     return await services.set_language(body.language)
+
+
+@router.get("/security", response_model=SecurityStatus)
+async def get_security(services: Services) -> SecurityStatus:
+    return await services.security.status()
+
+
+@router.post("/security/passcode", response_model=SecurityStatus)
+async def set_passcode(body: PasscodeRequest, services: Services) -> SecurityStatus:
+    try:
+        status = await services.security.set_passcode(body.passcode, body.current_passcode)
+    except PasscodeError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from None
+    await services.apply_unlock_state()
+    return status
+
+
+@router.post("/security/unlock", response_model=SecurityStatus)
+async def unlock_device(body: UnlockRequest, services: Services) -> SecurityStatus:
+    try:
+        status = await services.security.unlock(body.passcode)
+    except LockedOutError as exc:
+        raise HTTPException(status_code=429, detail=str(exc)) from None
+    except PasscodeError as exc:
+        raise HTTPException(status_code=401, detail=str(exc)) from None
+    await services.apply_unlock_state()
+    return status
+
+
+@router.post("/security/lock", response_model=SecurityStatus)
+async def lock_device(services: Services) -> SecurityStatus:
+    status = await services.security.lock()
+    await services.apply_unlock_state()
+    return status
 
 
 @router.get("/memory", response_model=MemoryStats)

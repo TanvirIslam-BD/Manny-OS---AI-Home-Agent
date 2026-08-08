@@ -432,6 +432,20 @@ svg { width: 1.3rem; height: 1.3rem; }
 .screen__toast button { min-width: 22px; min-height: 22px; padding: 0; color: #ffc9d0; border: 0; border-radius: 6px; background: rgba(255,255,255,.08); cursor: pointer; }
 .simulator-shell--kiosk .screen__toast { font-size: 2.3vmin; padding: 1.8vmin; border-radius: 2.2vmin; }
 
+.passcode { display: flex; flex-direction: column; gap: 6px; padding: 10px; border: 1px solid rgba(59,157,255,.2); border-radius: 12px; background: rgba(9,20,32,.7); }
+.passcode__row { display: flex; flex-direction: column; gap: 2px; }
+.passcode__row > span { color: #8299ab; font-size: .55rem; letter-spacing: .06em; text-transform: uppercase; }
+.passcode__row > small { color: #cfe6ff; font-size: .55rem; }
+.passcode input { min-height: 32px; padding: 6px 9px; color: #dff9ff; border: 1px solid rgba(40,197,255,.3); border-radius: 8px; background: #071c2e; font-size: .62rem; letter-spacing: .3em; }
+.passcode button { min-height: 32px; padding: 6px 10px; color: #dff9ff; border: 1px solid rgba(40,197,255,.3); border-radius: 8px; background: #0a2942; font-size: .58rem; cursor: pointer; }
+.passcode__actions { display: flex; gap: 6px; }
+.passcode__actions button { flex: 1 1 0; }
+.passcode__message { color: #9fd0ff; font-size: .52rem; }
+.simulator-shell--kiosk .passcode input { min-height: 8vmin; font-size: 3vmin; }
+.simulator-shell--kiosk .passcode button { min-height: 8vmin; font-size: 2.4vmin; }
+.simulator-shell--kiosk .passcode__row > span,
+.simulator-shell--kiosk .passcode__row > small { font-size: 2.3vmin; }
+
 .device-settings__mcp { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; text-align: left; }
 .device-settings__mcp small { color: #8299ab; font-size: .5rem; font-weight: 400; }
 .webview {

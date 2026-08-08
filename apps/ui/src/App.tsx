@@ -17,12 +17,14 @@ import {
   getPublicSettings,
   getMemory,
   clearMemory,
+  getSecurity,
 } from './api/client'
 import FinanceDashboard from './components/FinanceDashboard'
 import CameraPresence from './components/CameraPresence'
 import { Icon } from './components/Icons'
 import MannyFace from './components/MannyFace'
-import type { AgentResponse, FinanceDashboardData, MCPStatus, MemoryStats, PublicSettings, RuntimeSnapshot, RuntimeState } from './types'
+import PasscodePanel from './components/PasscodePanel'
+import type { AgentResponse, FinanceDashboardData, MCPStatus, MemoryStats, PublicSettings, SecurityStatus, RuntimeSnapshot, RuntimeState } from './types'
 import { listenOnce, speak, supportsBrowserVoice } from './voice/browser'
 
 const initialState: RuntimeSnapshot = {
@@ -99,6 +101,7 @@ function App() {
   const [settings, setSettings] = useState<PublicSettings | null>(null)
   const [authUrl, setAuthUrl] = useState<string | null>(null)
   const [memory, setMemory] = useState<MemoryStats | null>(null)
+  const [security, setSecurity] = useState<SecurityStatus | null>(null)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -108,6 +111,7 @@ function App() {
     getMcpStatus(controller.signal).then(setMcpStatus).catch(() => undefined)
     getPublicSettings(controller.signal).then(setSettings).catch(() => undefined)
     getMemory(controller.signal).then(setMemory).catch(() => undefined)
+    getSecurity(controller.signal).then(setSecurity).catch(() => undefined)
     const disconnect = connectEvents(
       (event) => {
         if (event.type === 'system.state') setSnapshot(event.payload)
@@ -351,6 +355,11 @@ function App() {
                   mcpStatus={mcpStatus}
                   onConnectMcp={() => void authorizeMoneyCopilot()}
                   memory={memory}
+                  security={security}
+                  onSecurityChange={async (status) => {
+                    setSecurity(status)
+                    setSnapshot(await getState())
+                  }}
                   onClearMemory={async () => {
                     if (!window.confirm('Clear everything Manny remembers from your conversations? Reminders and settings are kept.')) return
                     try {
@@ -525,6 +534,8 @@ export function DevicePanel({
   onConnectMcp,
   memory,
   onClearMemory,
+  security,
+  onSecurityChange,
 }: {
   view: DeviceView
   snapshot: RuntimeSnapshot
@@ -540,6 +551,8 @@ export function DevicePanel({
   onConnectMcp?: () => void
   memory?: MemoryStats | null
   onClearMemory?: () => Promise<void>
+  security?: SecurityStatus | null
+  onSecurityChange?: (status: SecurityStatus) => void
 }) {
   if (snapshot.state === 'PAIRING') {
     return <section className="device-panel" aria-label="Pair Manny"><span className="eyebrow">Secure pairing</span><strong>Connect your Money Copilot account</strong><p>Authorize from the setup panel. Manny never displays or stores your password.</p><code>PAIR-MANNY</code></section>
@@ -588,6 +601,9 @@ export function DevicePanel({
             ))}
           </select>
         </label>
+        {security && onSecurityChange && (
+          <PasscodePanel security={security} busy={busy} onChange={onSecurityChange} />
+        )}
         {memory && (
           <button
             className="device-settings__mcp"

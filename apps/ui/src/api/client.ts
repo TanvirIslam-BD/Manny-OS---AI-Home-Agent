@@ -1,4 +1,4 @@
-import type { AgentResponse, FinanceDashboardData, MannyEvent, MCPStatus, MemoryStats, PublicSettings, RuntimeSnapshot, RuntimeState, VoiceResponse } from '../types'
+import type { AgentResponse, FinanceDashboardData, MannyEvent, MCPStatus, MemoryStats, PublicSettings, SecurityStatus, RuntimeSnapshot, RuntimeState, VoiceResponse } from '../types'
 
 export async function askManny(text: string, language?: string): Promise<AgentResponse> {
   return postJson('/api/agent/query', { text, language })
@@ -39,6 +39,24 @@ export async function setPresence(people_count: number): Promise<RuntimeSnapshot
 
 export async function pushToTalk(): Promise<RuntimeSnapshot> {
   return postJson('/api/interaction/push-to-talk', {})
+}
+
+export async function getSecurity(signal?: AbortSignal): Promise<SecurityStatus> {
+  const response = await fetch('/api/security', { signal })
+  if (!response.ok) throw new Error(`Security request failed: ${response.status}`)
+  return response.json() as Promise<SecurityStatus>
+}
+
+export async function setPasscode(passcode: string, current_passcode?: string): Promise<SecurityStatus> {
+  return postJson('/api/security/passcode', { passcode, current_passcode })
+}
+
+export async function unlockDevice(passcode: string): Promise<SecurityStatus> {
+  return postJson('/api/security/unlock', { passcode })
+}
+
+export async function lockDevice(): Promise<SecurityStatus> {
+  return postJson('/api/security/lock', {})
 }
 
 export async function getMemory(signal?: AbortSignal): Promise<MemoryStats> {
