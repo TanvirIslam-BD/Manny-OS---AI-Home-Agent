@@ -214,6 +214,12 @@ class OllamaAgentModel:
         # claimed and the ~940 a character-based estimate suggested. That figure sets
         # OLLAMA_CONTEXT_LENGTH in the installer, so re-measure if the instruction grows
         # rather than estimating from its length.
+        #
+        # Do not shorten it for speed without re-running the routing cases. Cutting 25% of
+        # it took routing from 9/9 to 7/9 against a real model, and one failure was the
+        # Bengali finance case answering in reply instead of a placeholder template, which
+        # is a finance-boundary violation in this device's default language. The examples
+        # and the placeholder rules are doing work.
         messages: list[dict[str, str]] = [{"role": "system", "content": SYSTEM_INSTRUCTION}]
         messages.extend(message.model_dump() for message in history)
         request_text = text
