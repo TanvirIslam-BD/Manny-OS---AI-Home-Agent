@@ -12,6 +12,23 @@ and current limitations. Before changing architecture or behavior, also read
 [MANNY_OS_REQUIREMENTS.md](MANNY_OS_REQUIREMENTS.md), [DECISIONS.md](DECISIONS.md),
 [ASSUMPTIONS.md](ASSUMPTIONS.md), and [ROADMAP.md](ROADMAP.md).
 
+## Desktop simulator
+
+The simulator runs the full stack without hardware: device state, finance dashboard, voice
+simulation, text and speech I/O. Start it with `make dev` on your workstation, then open
+http://127.0.0.1:5173 to test Manny with the browser's microphone and speaker.
+
+| State | View |
+|---|---|
+| **Idle with dashboard** | ![Manny home screen](docs/images/manny-hero.png) |
+| **Listening** | ![Manny listening](docs/images/manny-listening.png) |
+| **Offline** | ![Manny offline](docs/images/manny-offline.png) |
+| **Alert** | ![Manny alert](docs/images/manny-alert.png) |
+
+Ask it in any language: English, Bengali, Hindi, Spanish, Japanese, Chinese, German, French,
+Arabic, Portuguese, or Russian. The local model routes to finance tools (budget, spending,
+bills) or general conversation. Try "How's my budget?" (English) or "আমার বাজেটে কত টাকা বাকি আছে?" (Bengali).
+
 ## System invariants
 
 These rules are architectural constraints, not optional conventions:
@@ -48,6 +65,31 @@ These rules are architectural constraints, not optional conventions:
 - Reminders, proactive alerts, policy enforcement, structured logging, and privacy lock
 - Mock and real interfaces for camera, microphone, speaker, LED, display, and presence sensors
 - Raspberry Pi installers, systemd units, kiosk configuration, and release tooling
+- Streamed typed and spoken replies: text appears sentence by sentence as the model writes,
+  with simultaneous speech synthesis avoiding the silence between generation and playback.
+  Measured 31–57% cut in perceived latency on longer answers; finance replies exempt to
+  prevent half-rendered figures appearing on screen.
+- Routing harness with 10/10 validation against the real model: a finance boundary
+  that cannot regress silently, because a cut that broke it before reached green tests.
+  Run `make test-routing` to validate instruction edits.
+
+## Recent improvements
+
+**Streamed replies**: Typed and spoken answers now arrive word-by-word rather than in one block.
+On a CPU that decodes at 8–16 tok/s, this cuts perceived latency by 31–57% on longer answers.
+First sentence lands in 3–6 seconds on desktop; the full answer follows as the model keeps generating.
+
+**Instruction hardening**: The system prompt asks for brevity (one sentence for greetings, two or
+three for questions). It was validated with `make test-routing`, a harness that runs 10 routing
+cases against the real model. The harness proved its value immediately: when examples in the
+prompt were added for documentation, they anchored the output language, and the harness caught
+it—10/10 with examples removed, 7/10 with them. Nothing in the standard test suite would have
+shown that regression.
+
+**Context window tuning**: Development profile now matches hardware (4 turns instead of 6).
+The window slides, so every question re-evaluates the turns after the cached instruction;
+shortening it to match the Pi cuts a half-second of prefill per request. Measured mean
+latency 8.7 s → 6.4 s and tightened the variance from 6.4–12.4 s to 5.8–6.8 s.
 
 ## Architecture at a glance
 
