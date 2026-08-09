@@ -18,6 +18,31 @@ jobs:
       - run: python -m mypy apps/core/manny
       - run: python -m pytest
 
+  arm64:
+    # The device is a Raspberry Pi 5, which is aarch64. Every other job runs on x86-64, so
+    # nothing here verified that the dependencies even resolve on the deployment
+    # architecture — that was discovered on first boot, or not at all. This runs the real
+    # suite on real ARM hardware rather than emulating it.
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - run: python -c "import platform; print('arch:', platform.machine())"
+      - run: python -m pip install -e '.[dev]'
+      - run: python -m pytest
+      - name: Load the raspberrypi profile on the target architecture
+        run: |
+          MANNY_CONFIG_PROFILE=raspberrypi python -c "
+          from manny.config import Settings, _read_profile
+          s = Settings(config_profile='raspberrypi', **_read_profile('raspberrypi'))
+          print('profile ok:', s.llm_backend, s.llm_model, s.llm_base_url)
+          "
+        working-directory: .
+        env:
+          PYTHONPATH: apps/core
+
   ui:
     runs-on: ubuntu-latest
     defaults:
