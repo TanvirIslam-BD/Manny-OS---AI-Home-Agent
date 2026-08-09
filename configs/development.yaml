@@ -6,9 +6,9 @@ face_recognition_enabled: false
 api_host: 127.0.0.1
 api_port: 8765
 log_level: INFO
-llm_backend: llama_cpp
-llm_base_url: http://127.0.0.1:8080
-llm_model: gemma-3-1b-it
+llm_backend: ollama
+llm_base_url: http://127.0.0.1:11434
+llm_model: gemma4:e2b
 llm_timeout_seconds: 60
 llm_max_tokens: 320
 llm_context_turns: 6

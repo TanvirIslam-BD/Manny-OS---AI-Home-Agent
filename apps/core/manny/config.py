@@ -73,9 +73,9 @@ class Settings(BaseSettings):
     # the language tag and ignores this; Kokoro requires an identifier from its own
     # catalogue and cannot invent one, so it is left empty rather than guessed.
     tts_voice: str = Field(default="", max_length=64)
-    llm_backend: Literal["mock", "llama_cpp"] = "mock"
-    llm_base_url: str = "http://127.0.0.1:8080"
-    llm_model: str = "gemma-3-1b-it"
+    llm_backend: Literal["mock", "ollama"] = "mock"
+    llm_base_url: str = "http://127.0.0.1:11434"
+    llm_model: str = "gemma4:e2b"
     llm_timeout_seconds: float = Field(default=60, gt=0, le=180)
     llm_max_tokens: int = Field(default=320, ge=32, le=512)
     llm_context_turns: int = Field(default=6, ge=1, le=12)
@@ -110,12 +110,13 @@ class Settings(BaseSettings):
     voice_max_utterance_seconds: float = Field(default=12.0, ge=2, le=30)
 
     camera_enabled: bool = True
-    vision_language_backend: Literal["none", "llama_cpp"] = "none"
-    # A second llama-server: one instance serves one model, and a vision-capable
-    # model is not the same file as the 1B text model. Point this at the text
-    # server only if a single multimodal model is serving both.
-    vision_language_base_url: str = "http://127.0.0.1:8081"
-    vision_language_model: str = "gemma-3-4b-it"
+    vision_language_backend: Literal["none", "ollama"] = "none"
+    # One Ollama daemon serves many models, so vision shares the endpoint with
+    # conversation. It also shares the model where that model is multimodal, which is
+    # the point of choosing one that is (ADR-020) — the separate port and separate
+    # weights were llama.cpp constraints, not requirements.
+    vision_language_base_url: str = "http://127.0.0.1:11434"
+    vision_language_model: str = "gemma4:e2b"
     vision_language_timeout_seconds: float = Field(default=120, gt=0, le=300)
     person_detector: Literal["none", "opencv_hog"] = "none"
     face_recognition_enabled: bool = False

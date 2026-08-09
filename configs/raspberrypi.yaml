@@ -16,23 +16,24 @@ whisper_cpp_model: /opt/manny/models/ggml-base.bin
 whisper_cpp_threads: 4
 whisper_cpp_timeout_seconds: 90
 espeak_ng_binary: /usr/bin/espeak-ng
-llm_backend: llama_cpp
-llm_base_url: http://127.0.0.1:8080
-# Must match the --alias manny-llm.service passes, which install_gemma_pi.sh derives
-# from MANNY_GEMMA_VARIANT. Change both together if you move off the 1B default.
-# 1B is the deliberate choice for conversation latency: on a Pi 5 it generates around
-# three times faster than 4B, and the model here only classifies intent and drafts
-# wording — the policy broker makes every MCP call.
-llm_model: gemma-3-1b-it
+llm_backend: ollama
+llm_base_url: http://127.0.0.1:11434
+# An Ollama tag, pulled by install_ollama_pi.sh. E2B is ~2B active parameters from a
+# larger stored model, so its resident size depends on whether the runtime offloads
+# the per-layer embeddings — check `ollama ps` on the device before trusting the
+# memory ceiling. The model classifies intent and drafts wording only; the policy
+# broker makes every MCP call (ADR-020).
+llm_model: gemma4:e2b
 llm_timeout_seconds: 60
 llm_max_tokens: 320
 llm_context_turns: 6
 
 # Camera deferred: no sensor selected yet, and vision is the largest latency and
-# memory cost on the device. Set camera_enabled true, install a multimodal model
-# with its projector, and switch this to llama_cpp to turn scene description on.
-# Port 8081, not 8080: one llama-server serves one model, and 8080 is the 1B text
-# model, which cannot read a frame. Scene description needs its own instance.
+# memory cost on the device. Set camera_enabled true and switch this to ollama to
+# turn scene description on — no second server and no separate weights, because one
+# daemon serves many models and this one is multimodal. Confirm the tag actually
+# exposes vision first: `ollama show` reports it, and runtime support for image
+# input has historically lagged the text path.
 vision_language_backend: none
-vision_language_base_url: http://127.0.0.1:8081
-vision_language_model: gemma-3-4b-it
+vision_language_base_url: http://127.0.0.1:11434
+vision_language_model: gemma4:e2b

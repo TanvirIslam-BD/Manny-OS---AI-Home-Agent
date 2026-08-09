@@ -1,4 +1,10 @@
-"""Local Gemma agent adapter for llama.cpp's loopback HTTP server."""
+"""Local Gemma agent adapter for Ollama's loopback HTTP server.
+
+Ollama is addressed through its OpenAI-compatible /v1/chat/completions endpoint, so
+this is an ordinary chat client rather than anything Ollama-specific. Any server
+speaking that dialect on loopback works, which is what made replacing llama.cpp a
+configuration change rather than a rewrite (ADR-020).
+"""
 
 from __future__ import annotations
 
@@ -84,7 +90,7 @@ class _GeneralReply(BaseModel):
     language: str = Field(default="en", min_length=2, max_length=35)
 
 
-class LlamaCppAgentModel:
+class OllamaAgentModel:
     """Schema-validated local model accessed only over the loopback interface."""
 
     def __init__(
@@ -134,7 +140,7 @@ class LlamaCppAgentModel:
                 )
             except (json.JSONDecodeError, ValidationError, ValueError, TypeError) as exc:
                 self._status = "invalid_response"
-                raise RuntimeError("Local Gemma returned an invalid response") from exc
+                raise RuntimeError("The local model returned an invalid response") from exc
         self._status = "ok"
         return decision
 
@@ -179,10 +185,10 @@ class LlamaCppAgentModel:
             reply = _GeneralReply.model_validate_json(_assistant_content(response.json()))
         except httpx.HTTPError as exc:
             self._status = "unavailable"
-            raise RuntimeError("Local Gemma is unavailable") from exc
+            raise RuntimeError("The local model is unavailable") from exc
         except (ValidationError, ValueError, TypeError) as exc:
             self._status = "invalid_response"
-            raise RuntimeError("Local Gemma returned an invalid response") from exc
+            raise RuntimeError("The local model returned an invalid response") from exc
         self._status = "ok"
         return AgentDecision(
             intent="general",
@@ -252,7 +258,7 @@ class LlamaCppAgentModel:
                 response.raise_for_status()
         except httpx.HTTPError as exc:
             self._status = "unavailable"
-            raise RuntimeError("Local Gemma is unavailable") from exc
+            raise RuntimeError("The local model is unavailable") from exc
         content = _assistant_content(response.json())
         return AgentDecision.model_validate(json.loads(content))
 
@@ -298,7 +304,7 @@ class LlamaCppAgentModel:
                             await on_reply_chunk(trailing)
         except httpx.HTTPError as exc:
             self._status = "unavailable"
-            raise RuntimeError("Local Gemma is unavailable") from exc
+            raise RuntimeError("The local model is unavailable") from exc
         if not field.complete:
             # Truncated mid-reply: say what did arrive, then let validation fail and
             # the repair attempt run.

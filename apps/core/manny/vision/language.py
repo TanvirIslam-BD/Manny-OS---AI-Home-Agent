@@ -40,11 +40,15 @@ class UnavailableVisionModel:
         raise RuntimeError("no vision-language model is configured")
 
 
-class LlamaCppVisionModel:
-    """A multimodal llama.cpp server on the loopback interface.
+class OllamaVisionModel:
+    """A multimodal model served by Ollama on the loopback interface.
 
-    Requires llama-server started with a vision projector, e.g. Gemma 3 4B IT or
-    a comparable small VLM. The 1B text model cannot do this.
+    Requires a model whose vision encoder the runtime actually exposes, not merely
+    one whose weights include it — runtime support for image input has historically
+    lagged the text path. `ollama show` reports whether the tag advertises vision.
+
+    Unlike llama.cpp, one Ollama daemon serves many models, so this may share both
+    the endpoint and the model with conversation when that model is multimodal.
     """
 
     def __init__(
@@ -123,8 +127,8 @@ class LlamaCppVisionModel:
 def build_vision_language_model(
     backend: str, *, base_url: str, model: str, timeout_seconds: float
 ) -> VisionLanguageModel:
-    if backend == "llama_cpp":
-        return LlamaCppVisionModel(
+    if backend == "ollama":
+        return OllamaVisionModel(
             base_url=base_url, model=model, timeout_seconds=timeout_seconds
         )
     return UnavailableVisionModel()

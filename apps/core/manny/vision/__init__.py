@@ -7,7 +7,7 @@ from manny.vision.detector import (
     build_person_detector,
 )
 from manny.vision.language import (
-    LlamaCppVisionModel,
+    OllamaVisionModel,
     UnavailableVisionModel,
     VisionLanguageModel,
     build_vision_language_model,
@@ -21,7 +21,7 @@ __all__ = [
     "OpenCvHogPersonDetector",
     "PersonDetector",
     "Picamera2Adapter",
-    "LlamaCppVisionModel",
+    "OllamaVisionModel",
     "PresenceEvent",
     "SceneAnswer",
     "UnavailableVisionModel",

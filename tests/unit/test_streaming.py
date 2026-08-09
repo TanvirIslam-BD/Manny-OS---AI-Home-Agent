@@ -7,7 +7,7 @@ import json
 import httpx
 import pytest
 
-from manny.agent.llama_cpp import LlamaCppAgentModel
+from manny.agent.ollama import OllamaAgentModel
 from manny.agent.streaming import ReplyFieldStream, SentenceChunker
 
 BACKSLASH = chr(92)
@@ -111,7 +111,7 @@ def _sse(document: str, size: int = 4) -> bytes:
     return (NEWLINE + NEWLINE).join(lines).encode("utf-8")
 
 
-def build_model(document: str) -> tuple[LlamaCppAgentModel, list[dict[str, object]]]:
+def build_model(document: str) -> tuple[OllamaAgentModel, list[dict[str, object]]]:
     seen: list[dict[str, object]] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -122,9 +122,9 @@ def build_model(document: str) -> tuple[LlamaCppAgentModel, list[dict[str, objec
             headers={"content-type": "text/event-stream"},
         )
 
-    model = LlamaCppAgentModel(
-        base_url="http://127.0.0.1:8080",
-        model="gemma-3-1b-it",
+    model = OllamaAgentModel(
+        base_url="http://127.0.0.1:11434",
+        model="gemma4:e2b",
         timeout_seconds=5,
         max_tokens=320,
         transport=httpx.MockTransport(handler),
@@ -191,9 +191,9 @@ async def test_without_a_listener_the_request_is_not_streamed() -> None:
             200, json={"choices": [{"message": {"content": document}}]}
         )
 
-    model = LlamaCppAgentModel(
-        base_url="http://127.0.0.1:8080",
-        model="gemma-3-1b-it",
+    model = OllamaAgentModel(
+        base_url="http://127.0.0.1:11434",
+        model="gemma4:e2b",
         timeout_seconds=5,
         max_tokens=320,
         transport=httpx.MockTransport(handler),

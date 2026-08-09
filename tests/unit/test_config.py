@@ -86,15 +86,21 @@ def test_voice_loop_is_on_by_default_but_only_runs_on_real_hardware() -> None:
     assert disabled.voice_loop_active is False
 
 
-def test_vision_and_text_models_are_served_separately() -> None:
+def test_vision_and_conversation_share_one_local_runtime() -> None:
     settings = Settings(_env_file=None)
 
-    # One llama-server serves one model, so a vision model needs its own port
-    # unless a single multimodal model is serving both.
-    assert settings.vision_language_base_url != settings.llm_base_url
+    # Under llama.cpp these had to differ: one server served one model, so vision
+    # needed its own port and its own weights. One Ollama daemon serves many models,
+    # and the chosen model is multimodal, so both now point at the same place —
+    # a simplification ADR-020 exists to record.
+    assert settings.vision_language_base_url == settings.llm_base_url
+    assert settings.vision_language_model == settings.llm_model
 
+    # Sharing the endpoint must not weaken the loopback rule for either of them.
     with pytest.raises(ValidationError):
         Settings(vision_language_base_url="https://vision.example.com", _env_file=None)
+    with pytest.raises(ValidationError):
+        Settings(llm_base_url="http://10.0.0.5:11434", _env_file=None)
 
 
 def test_production_refuses_to_start_without_a_credential_vault() -> None:

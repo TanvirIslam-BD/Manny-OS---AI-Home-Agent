@@ -3,17 +3,17 @@ import json
 import httpx
 import pytest
 
-from manny.agent import LlamaCppAgentModel, RuleBasedAgent, ToolBroker
+from manny.agent import OllamaAgentModel, RuleBasedAgent, ToolBroker
 from manny.agent.models import AgentDecision, AgentQuery, ConversationMessage
 from manny.mcp import MockMCPClient
 from manny.policy import PolicyEngine
 from manny.state import PrivacyState
 
 
-def model(transport: httpx.AsyncBaseTransport) -> LlamaCppAgentModel:
-    return LlamaCppAgentModel(
-        base_url="http://127.0.0.1:8080",
-        model="gemma-3-1b-it",
+def model(transport: httpx.AsyncBaseTransport) -> OllamaAgentModel:
+    return OllamaAgentModel(
+        base_url="http://127.0.0.1:11434",
+        model="gemma4:e2b",
         timeout_seconds=2,
         max_tokens=128,
         transport=transport,
@@ -21,11 +21,11 @@ def model(transport: httpx.AsyncBaseTransport) -> LlamaCppAgentModel:
 
 
 @pytest.mark.asyncio
-async def test_llama_cpp_uses_loopback_schema_constrained_completion() -> None:
+async def test_the_local_model_uses_a_loopback_schema_constrained_completion() -> None:
     async def handler(request: httpx.Request) -> httpx.Response:
         payload = json.loads(request.content)
-        assert request.url == "http://127.0.0.1:8080/v1/chat/completions"
-        assert payload["model"] == "gemma-3-1b-it"
+        assert request.url == "http://127.0.0.1:11434/v1/chat/completions"
+        assert payload["model"] == "gemma4:e2b"
         assert payload["response_format"]["json_schema"]["strict"] is True
         # The instruction must lead as a stable system message so llama.cpp can
         # keep it in the prompt cache; the user turn stays last.
@@ -47,7 +47,7 @@ async def test_llama_cpp_uses_loopback_schema_constrained_completion() -> None:
 
 
 @pytest.mark.asyncio
-async def test_llama_cpp_repairs_one_invalid_response() -> None:
+async def test_the_local_model_repairs_one_invalid_response() -> None:
     attempts = 0
 
     async def handler(request: httpx.Request) -> httpx.Response:
@@ -63,7 +63,7 @@ async def test_llama_cpp_repairs_one_invalid_response() -> None:
 
 
 @pytest.mark.asyncio
-async def test_llama_cpp_constrains_non_personal_education_to_general() -> None:
+async def test_the_local_model_constrains_non_personal_education_to_general() -> None:
     async def handler(request: httpx.Request) -> httpx.Response:
         payload = json.loads(request.content)
         properties = payload["response_format"]["json_schema"]["schema"]["properties"]

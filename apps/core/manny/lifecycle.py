@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import time
 from typing import Any
 
-from manny.agent import LlamaCppAgentModel, RuleBasedAgent, ToolBroker
+from manny.agent import OllamaAgentModel, RuleBasedAgent, ToolBroker
 from manny.api.events import EventBus
 from manny.config import Settings
 from manny.hardware import HardwareBundle, LedState, build_mock_hardware, build_real_hardware
@@ -268,13 +268,13 @@ def build_services(settings: Settings) -> RuntimeServices:
         time.fromisoformat(settings.quiet_hours_end),
     )
     model = (
-        LlamaCppAgentModel(
+        OllamaAgentModel(
             base_url=settings.llm_base_url,
             model=settings.llm_model,
             timeout_seconds=settings.llm_timeout_seconds,
             max_tokens=settings.llm_max_tokens,
         )
-        if settings.llm_backend == "llama_cpp"
+        if settings.llm_backend == "ollama"
         else None
     )
     hardware = (
