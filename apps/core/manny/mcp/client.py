@@ -21,7 +21,7 @@ from pydantic import AnyUrl
 from manny import __version__
 from manny.config import REPOSITORY_ROOT, Settings
 from manny.mcp.models import MCPConnectionPhase, MCPStatus
-from manny.mcp.storage import JsonTokenStorage, KeyringTokenStorage
+from manny.mcp.storage import JsonTokenStorage, KeyringTokenStorage, verify_keyring_backend
 
 logger = logging.getLogger(__name__)
 _RECONNECT_BACKOFF_SECONDS = 30.0
@@ -63,9 +63,9 @@ class MoneyCopilotMCPClient:
                 keyring = importlib.import_module("keyring")
             except ImportError as exc:
                 raise RuntimeError("install Manny's production keyring dependency") from exc
-            methods = ("get_password", "set_password", "delete_password")
-            if not all(hasattr(keyring, name) for name in methods):
-                raise RuntimeError("installed keyring backend is incompatible")
+            # Subsumes the old hasattr check, which only proved the module has an
+            # API and never that a vault exists behind it.
+            verify_keyring_backend(keyring, device_id=settings.device_id)
             self._storage = KeyringTokenStorage(
                 keyring,
                 device_id=settings.device_id,

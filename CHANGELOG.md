@@ -39,5 +39,6 @@ All notable changes to Manny OS are documented here.
 - Secret and local-data exclusions
 - Face recognition disabled by default
 - MCP tokens excluded from API responses, logs, Git, and browser JavaScript
-- Production token storage requires the OS credential vault
+- Production token storage requires the OS credential vault, and selecting it now probes the vault at startup instead of accepting any module that merely exposes the API, so a host without one fails immediately rather than partway through authorization
+- On-device token exposure is stated rather than implied: the Pi keeps OAuth material in a mode-0600 file because a headless appliance cannot hold a vault key anywhere it cannot itself reach, so physical possession of the device is possession of the Money Copilot session and loss is handled by server-side revocation (ADR-013)
 - Production updates require checksum and signature verification

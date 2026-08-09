@@ -95,3 +95,26 @@ def test_vision_and_text_models_are_served_separately() -> None:
 
     with pytest.raises(ValidationError):
         Settings(vision_language_base_url="https://vision.example.com", _env_file=None)
+
+
+def test_production_refuses_to_start_without_a_credential_vault() -> None:
+    with pytest.raises(ValidationError, match="keyring"):
+        Settings(environment="production", mcp_token_storage="json", _env_file=None)
+
+    assert (
+        Settings(
+            environment="production", mcp_token_storage="keyring", _env_file=None
+        ).mcp_token_storage
+        == "keyring"
+    )
+
+
+def test_raspberry_pi_is_deliberately_exempt_from_the_vault_requirement() -> None:
+    # Not an oversight, and not to be "fixed" by extending the rule above: a headless
+    # appliance has to reconnect after a power cut with nobody present, so a vault
+    # would have to unlock itself from the same SD card that holds the tokens, and
+    # Pi 5 has no TPM to bind the key to instead. See ADR-013 and docs/security.md,
+    # which state the resulting exposure rather than implying protection.
+    settings = Settings(environment="raspberrypi", mcp_token_storage="json", _env_file=None)
+
+    assert settings.mcp_token_storage == "json"

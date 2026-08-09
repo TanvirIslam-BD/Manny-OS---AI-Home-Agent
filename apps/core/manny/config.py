@@ -155,6 +155,14 @@ class Settings(BaseSettings):
                 raise ValueError("MANNY_MCP_URL is required for remote_http mode")
             if not self.mcp_url.startswith("https://"):
                 raise ValueError("remote MCP connections require HTTPS")
+        # Deliberately not extended to raspberrypi. The Pi is a headless appliance
+        # that must restore its connection after a power cut with nobody present, so
+        # any vault it uses has to unlock itself, which puts the unlocking secret on
+        # the same SD card as the tokens. Pi 5 has no TPM to bind it to, so an
+        # auto-unlocked vault is a mode-0600 file plus a daemon that can strand the
+        # device — more failure surface for no gain against the threat that matters,
+        # someone taking the card. The Pi profile therefore uses json storage and
+        # docs/security.md states that exposure instead of implying otherwise.
         if self.environment == "production" and self.mcp_token_storage != "keyring":
             raise ValueError("production requires OS keyring token storage")
         if self.hardware_mode == "real" and not self.audio_device:

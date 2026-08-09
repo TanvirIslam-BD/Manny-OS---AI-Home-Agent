@@ -79,10 +79,41 @@ class JsonTokenStorage:
         os.chmod(self._path, 0o600)
 
 
+KEYRING_SERVICE = "manny-os-money-copilot"
+
+
 class KeyringBackend(Protocol):
     def get_password(self, service: str, username: str) -> str | None: ...
     def set_password(self, service: str, username: str, password: str) -> None: ...
     def delete_password(self, service: str, username: str) -> None: ...
+
+
+class KeyringUnavailableError(RuntimeError):
+    """Keyring storage was selected but no vault answered."""
+
+
+def verify_keyring_backend(
+    backend: KeyringBackend, *, device_id: str, service: str = KEYRING_SERVICE
+) -> None:
+    """Prove the vault answers before trusting it with OAuth material.
+
+    Checking that the keyring module exposes get/set/delete proves nothing: the
+    module always exposes them, including when it resolved to the backend that
+    raises on first use because no vault exists. That check read like validation
+    while letting a misconfigured host start cleanly and then fail partway
+    through authorization, which is the worst moment to discover it.
+
+    Reading an absent key is side-effect free on a working vault and raises on one
+    that cannot store anything, so it distinguishes the two at startup.
+    """
+    try:
+        backend.get_password(service, device_id)
+    except Exception as exc:  # backend-specific; keyring raises its own hierarchy
+        raise KeyringUnavailableError(
+            "MANNY_MCP_TOKEN_STORAGE=keyring, but no usable OS credential vault "
+            "answered on this host. Provision a vault, or select json storage and "
+            "accept that tokens rest in a mode-0600 file on disk."
+        ) from exc
 
 
 class KeyringTokenStorage:
@@ -93,7 +124,7 @@ class KeyringTokenStorage:
         backend: KeyringBackend,
         *,
         device_id: str,
-        service: str = "manny-os-money-copilot",
+        service: str = KEYRING_SERVICE,
     ) -> None:
         self._backend = backend
         self._service = service

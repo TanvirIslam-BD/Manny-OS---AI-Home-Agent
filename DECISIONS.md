@@ -76,7 +76,11 @@ Decision: Normalize provider-specific structured results into Manny's typed sema
 
 Status: Accepted
 
-Decision: Store reminders and minimal timestamped finance cache in SQLite. Development OAuth data uses an ignored restrictive file; production requires an OS keyring.
+Decision: Store reminders and minimal timestamped finance cache in SQLite. OAuth data uses an ignored mode-0600 file; the `production` environment additionally requires an OS keyring and refuses to start without one.
+
+The Raspberry Pi profile is deliberately not held to the keyring requirement. A headless appliance has to restore its connection after a power cut with nobody present, so a vault would need to unlock itself, which puts the unlocking secret on the same SD card as the tokens. Pi 5 has no TPM to bind it to, so an auto-unlocked vault is a mode-0600 file plus a daemon that can strand the device — more failure surface for no gain against the threat that matters, which is someone taking the card.
+
+Consequence, recorded rather than implied: on the device, physical possession is possession of the Money Copilot session. Loss is handled by revoking server-side, not by on-device protection. Closing this properly needs hardware — a TPM or secure element — and is a hardware decision, not a software one.
 
 ## ADR-014 — Optional local media runtimes
 
