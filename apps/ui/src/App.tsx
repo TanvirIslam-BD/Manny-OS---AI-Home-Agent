@@ -31,6 +31,7 @@ import OnScreenKeyboard from './components/OnScreenKeyboard'
 import AlertsView from './components/AlertsView'
 import type { AgentResponse, FinanceDashboardData, MCPStatus, MemoryStats, PublicSettings, Reminder, SecurityStatus, RuntimeSnapshot, RuntimeState } from './types'
 import { listenOnce, playAudio, speak, supportsBrowserVoice } from './voice/browser'
+import { createSpeechQueue } from './voice/queue'
 
 const initialState: RuntimeSnapshot = {
   state: 'BOOTING',
@@ -107,6 +108,9 @@ function App() {
   // Sentences of a reply the model has not finished writing. Shown until the complete
   // answer arrives, so a slow generation reads as progress rather than as a hang.
   const [streamingReply, setStreamingReply] = useState('')
+  // One queue for the session. Speaking each sentence as it lands is what the device
+  // already does; a ref keeps the same queue across renders so its ordering survives.
+  const speechQueue = useRef(createSpeechQueue(synthesizeSpeech))
   const [financeData, setFinanceData] = useState<FinanceDashboardData | null>(null)
   const [financeLoading, setFinanceLoading] = useState(false)
   const [financeError, setFinanceError] = useState<string | null>(null)
@@ -132,6 +136,7 @@ function App() {
         if (event.type === 'mcp.status') setMcpStatus(event.payload)
         if (event.type === 'agent.reply_chunk') {
           setStreamingReply((sentences) => sentences + event.payload.text)
+          speechQueue.current.say(event.payload.text, event.payload.language)
         }
         // A reminder can be created by voice or by typing; refresh the list so
         // the Alerts screen reflects it without a reload.
@@ -259,10 +264,11 @@ function App() {
     if (!question.trim()) return
     setBusy(true)
     setError(null)
-    // Clear both so the previous answer does not sit under the new one's sentences
-    // while the model works.
+    // Clear all three so the previous answer neither sits under the new one's
+    // sentences nor keeps talking over them.
     setAgentResponse(null)
     setStreamingReply('')
+    speechQueue.current.cancel()
     try {
       const response = await askManny(
         question.trim(),
@@ -270,11 +276,21 @@ function App() {
       )
       setAgentResponse(response)
       setStreamingReply('')
-      await announce(response.answer, response.language)
+      if (speechQueue.current.spokeAnything()) {
+        // Already said aloud, sentence by sentence, while it was being written —
+        // the same branch the voice coordinator takes after a streamed turn.
+        // Speaking the whole reply again here would repeat it.
+        const failure = speechQueue.current.failure()
+        if (failure) setError(failure)
+      } else {
+        await announce(response.answer, response.language)
+      }
     } catch (reason) {
       // Half a reply next to an error reads as though the error interrupted speech
-      // Manny is still about to finish. It is not; the turn is over.
+      // Manny is still about to finish. It is not; the turn is over, so stop the
+      // sentences still queued as well as the text already shown.
       setStreamingReply('')
+      speechQueue.current.cancel()
       setError(messageFrom(reason))
     } finally {
       setBusy(false)
@@ -300,6 +316,10 @@ function App() {
     }
     setBusy(true)
     setError(null)
+    // Manny must not still be finishing the last answer while it listens for the
+    // next question — that is the half-duplex rule the device enforces with its
+    // turn lock, and the microphone would otherwise hear the speaker.
+    speechQueue.current.cancel()
     try {
       await pushToTalk()
       const transcript = await listenOnce(listeningLanguage)
@@ -320,6 +340,7 @@ function App() {
       await announce(response.answer, response.language)
     } catch (reason) {
       setError(messageFrom(reason))
+      speechQueue.current.cancel()
       setSnapshot(await cancelInteraction().catch(() => snapshot))
     } finally {
       setBusy(false)

@@ -18,7 +18,7 @@ from mcp.shared.auth import AuthorizationCodeResult
 from pydantic import BaseModel, Field
 
 from manny.agent import AgentQuery, AgentResponse
-from manny.i18n import LANGUAGE_TAG_PATTERN
+from manny.i18n import LANGUAGE_TAG_PATTERN, detect_text_language
 from manny.lifecycle import RuntimeServices
 from manny.mcp import MCPStatus
 from manny.memory import MemoryStats
@@ -144,6 +144,12 @@ async def agent_query(body: AgentQuery, services: Services) -> AgentResponse:
     # unchanged; what changes is that the user reads the first sentence while the
     # rest is still being generated.
     spoken_any = False
+    # The reply's own language field arrives after the reply text does, so a sentence
+    # has to be tagged with the language of the question — the same rule and the same
+    # reason the voice coordinator uses the transcript's language when it speaks a
+    # piece early. Without it the client cannot choose a voice until the reply is
+    # over, which is exactly the wait streaming exists to remove.
+    chunk_language = detect_text_language(body.text, body.language)
 
     async def publish_chunk(piece: str) -> None:
         nonlocal spoken_any
@@ -154,7 +160,9 @@ async def agent_query(body: AgentQuery, services: Services) -> AgentResponse:
             await services.state.transition(
                 RuntimeState.SPEAKING, force=True, message=piece[:160]
             )
-        await services.events.publish("agent.reply_chunk", {"text": piece})
+        await services.events.publish(
+            "agent.reply_chunk", {"text": piece, "language": chunk_language}
+        )
 
     try:
         # `authenticated` from the caller is advisory only. Anything able to reach

@@ -91,13 +91,32 @@ function voiceFor(voices: SpeechSynthesisVoice[], language: string): SpeechSynth
   )
 }
 
-export async function speak(text: string, language = 'en'): Promise<SpeechOutcome> {
+/**
+ * `untilFinished` resolves when the audio stops rather than when it starts.
+ *
+ * The default stays resolve-on-start because `announce` awaits it before releasing
+ * the form, and blocking a button for the length of a spoken reply would make the UI
+ * feel slower than it is. Sequencing a streamed reply needs the opposite: each
+ * sentence has to finish before the next begins, or they play over each other.
+ */
+export interface SpeechTiming {
+  untilFinished?: boolean
+}
+
+export async function speak(
+  text: string,
+  language = 'en',
+  { untilFinished = false }: SpeechTiming = {},
+): Promise<SpeechOutcome> {
   if (!('speechSynthesis' in window)) {
     return { spoken: false, reason: 'This browser cannot speak.' }
   }
   if (!text.trim()) return { spoken: false, reason: 'There was nothing to say.' }
 
-  window.speechSynthesis.cancel()
+  // Only clear the queue when this call owns the whole reply. A streamed reply
+  // enqueues sentence after sentence, and cancelling here would cut off the one
+  // still being spoken every time the next arrived.
+  if (!untilFinished) window.speechSynthesis.cancel()
   const voices = await loadVoices()
   const voice = voiceFor(voices, language)
   if (!voice) {
@@ -115,21 +134,53 @@ export async function speak(text: string, language = 'en'): Promise<SpeechOutcom
   utterance.lang = language
   utterance.voice = voice
   utterance.rate = 1
-  window.speechSynthesis.speak(utterance)
+  if (!untilFinished) {
+    window.speechSynthesis.speak(utterance)
+    return { spoken: true }
+  }
+  await new Promise<void>((resolve) => {
+    // Resolve on error as well: a sentence that failed to speak must not strand the
+    // rest of the reply behind it.
+    utterance.onend = () => resolve()
+    utterance.onerror = () => resolve()
+    window.speechSynthesis.speak(utterance)
+  })
   return { spoken: true }
 }
 
 /**
+ * The clip currently playing, so it can be stopped.
+ *
+ * `speechSynthesis.cancel()` silences browser voices globally, but device-synthesised
+ * audio plays through an element nobody else holds a reference to. Without this a
+ * cancelled turn keeps talking over the next one.
+ */
+let playing: HTMLAudioElement | null = null
+
+/**
  * Play audio the device synthesised, for languages this browser has no voice for.
  *
- * Resolves once playback starts rather than once it finishes, matching `speak`,
- * which queues an utterance and returns. The object URL is released on either
- * ending or failing so a long session does not accumulate blobs.
+ * Resolves once playback starts by default, matching `speak`. Pass `untilFinished`
+ * to wait for the end, which sequencing a streamed reply requires. The object URL is
+ * released on ending or failing so a long session does not accumulate blobs.
  */
-export async function playAudio(audio: Blob): Promise<void> {
+export async function playAudio(
+  audio: Blob,
+  { untilFinished = false }: SpeechTiming = {},
+): Promise<void> {
   const url = URL.createObjectURL(audio)
   const element = new Audio(url)
-  const release = () => URL.revokeObjectURL(url)
+  playing = element
+  const release = () => {
+    URL.revokeObjectURL(url)
+    if (playing === element) playing = null
+  }
+  const finished = new Promise<void>((resolve) => {
+    // Errors resolve rather than reject: one unplayable sentence should not strand
+    // the remainder of the reply behind it.
+    element.addEventListener('ended', () => resolve(), { once: true })
+    element.addEventListener('error', () => resolve(), { once: true })
+  })
   element.addEventListener('ended', release, { once: true })
   element.addEventListener('error', release, { once: true })
   try {
@@ -137,5 +188,15 @@ export async function playAudio(audio: Blob): Promise<void> {
   } catch (reason) {
     release()
     throw reason
+  }
+  if (untilFinished) await finished
+}
+
+/** Silence everything at once: queued browser utterances and device audio alike. */
+export function stopSpeaking(): void {
+  if ('speechSynthesis' in window) window.speechSynthesis.cancel()
+  if (playing) {
+    playing.pause()
+    playing = null
   }
 }

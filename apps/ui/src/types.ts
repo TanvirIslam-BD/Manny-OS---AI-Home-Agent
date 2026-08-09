@@ -132,8 +132,9 @@ export interface VoiceResponse {
 export type MannyEvent =
   | { type: 'system.state'; payload: RuntimeSnapshot }
   | { type: 'mcp.status'; payload: MCPStatus }
-  // One sentence of a reply the model is still generating. Only general-intent
-  // answers stream; finance answers are built from validated MCP data and arrive whole.
-  | { type: 'agent.reply_chunk'; payload: { text: string } }
+  // One sentence of a reply the model is still generating, tagged with the language
+  // of the question — the reply's own language is not known until it ends. Only
+  // general-intent answers stream; finance answers arrive whole from validated MCP data.
+  | { type: 'agent.reply_chunk'; payload: { text: string; language: string } }
   | { type: 'notification.created'; payload: Record<string, unknown> }
   | { type: 'presence.changed'; payload: Record<string, unknown> }

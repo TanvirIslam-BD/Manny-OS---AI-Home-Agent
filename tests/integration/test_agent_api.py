@@ -121,8 +121,12 @@ def test_a_typed_reply_is_published_sentence_by_sentence_while_it_is_written(
         frames = [websocket.receive_json() for _ in range(4)]
 
     assert response.status_code == 200
-    chunks = [f["payload"]["text"] for f in frames if f["type"] == "agent.reply_chunk"]
-    assert chunks == ["First sentence. ", "Second sentence."]
+    published = [f["payload"] for f in frames if f["type"] == "agent.reply_chunk"]
+    assert [p["text"] for p in published] == ["First sentence. ", "Second sentence."]
+    # Tagged with the question's language, because the reply's own language field
+    # arrives only when the reply ends — and a client that cannot pick a voice until
+    # then is back to waiting for the whole thing.
+    assert all(p["language"] for p in published)
     # The face stops thinking once there is something to say, not at the end.
     speaking = [
         f for f in frames
