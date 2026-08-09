@@ -18,7 +18,12 @@ whisper_cpp_timeout_seconds: 90
 espeak_ng_binary: /usr/bin/espeak-ng
 llm_backend: llama_cpp
 llm_base_url: http://127.0.0.1:8080
-llm_model: gemma-3-4b-it
+# Must match the --alias manny-llm.service passes, which install_gemma_pi.sh derives
+# from MANNY_GEMMA_VARIANT. Change both together if you move off the 1B default.
+# 1B is the deliberate choice for conversation latency: on a Pi 5 it generates around
+# three times faster than 4B, and the model here only classifies intent and drafts
+# wording — the policy broker makes every MCP call.
+llm_model: gemma-3-1b-it
 llm_timeout_seconds: 60
 llm_max_tokens: 320
 llm_context_turns: 6
@@ -26,6 +31,8 @@ llm_context_turns: 6
 # Camera deferred: no sensor selected yet, and vision is the largest latency and
 # memory cost on the device. Set camera_enabled true, install a multimodal model
 # with its projector, and switch this to llama_cpp to turn scene description on.
+# Port 8081, not 8080: one llama-server serves one model, and 8080 is the 1B text
+# model, which cannot read a frame. Scene description needs its own instance.
 vision_language_backend: none
-vision_language_base_url: http://127.0.0.1:8080
+vision_language_base_url: http://127.0.0.1:8081
 vision_language_model: gemma-3-4b-it

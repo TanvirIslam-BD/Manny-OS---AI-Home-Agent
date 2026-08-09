@@ -24,6 +24,14 @@ All notable changes to Manny OS are documented here.
 - Live MCP-backed device cards, persistent MCP sessions, request coalescing, and verified-data refresh controls
 - Gemma 3 1B IT llama.cpp adapter, short conversational context, schema-validated routing, deterministic fallback, and hardened Pi model service
 - Multilingual text and voice pipeline with BCP-47 metadata, same-language safe finance templates, whisper.cpp automatic STT detection, eSpeak NG output, browser language controls, and Pi installation
+- Selectable Gemma quantisation via `MANNY_GEMMA_QUANT`, with `q4_0` available for faster Cortex-A76 prompt processing once you supply a checksum you verified
+
+### Fixed
+
+- Pi and production profiles asked for `gemma-3-4b-it` while the installer downloaded the 1B model, so `manny-llm` exited on a missing file after a default install
+- `manny-llm.service` now launches the model the installer recorded in `/opt/manny/model.env` instead of a hardcoded filename that could drift from what is on disk
+- Hardware verification accepts either quantisation, checks the recorded model against the one present on disk, and confirms the running server answers to the alias the core sends
+- Pi and production profiles pointed scene description at port 8080, the text model's server, which cannot read a frame; both now use 8081 as `Settings` already defaulted to
 
 ### Security
 

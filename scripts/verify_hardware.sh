@@ -37,6 +37,7 @@ trap 'rm -rf "${workspace}"' EXIT
 : "${MANNY_LED_STATE_PATH:=}"
 : "${MANNY_DISPLAY_BRIGHTNESS_PATH:=}"
 : "${MANNY_LLM_BASE_URL:=http://127.0.0.1:8080}"
+: "${MANNY_LLM_MODEL:=gemma-3-1b-it}"
 : "${MANNY_CAMERA_ENABLED:=false}"
 capture_seconds=2
 
@@ -88,8 +89,11 @@ check 'audio capture device' bash -c 'arecord -l | grep -q card'
 check 'audio playback device' bash -c 'aplay -l | grep -q card'
 check 'Chromium kiosk' command -v chromium
 check 'llama.cpp server' test -x /opt/manny/llama.cpp/build/bin/llama-server
-check 'Gemma model' bash -c 'ls /opt/manny/models/gemma-3-*-it-Q4_K_M.gguf >/dev/null 2>&1'
-check 'vision projector (4B multimodal only)' bash -c   'ls /opt/manny/models/gemma-3-4b-it-mmproj-*.gguf >/dev/null 2>&1 || test -r /opt/manny/models/gemma-3-1b-it-Q4_K_M.gguf'
+check 'Gemma model' bash -c 'ls /opt/manny/models/gemma-3-*-it-Q4_*.gguf >/dev/null 2>&1'
+# The unit launches whatever the installer recorded here, so a model on disk that
+# this file disagrees with is the drift that used to stop llama-server from starting.
+check 'recorded model matches disk' bash -c   '. /opt/manny/model.env && test -r "${MANNY_LLM_MODEL_FILE}"'
+check 'vision projector (4B multimodal only)' bash -c   'ls /opt/manny/models/gemma-3-4b-it-mmproj-*.gguf >/dev/null 2>&1 || ls /opt/manny/models/gemma-3-1b-it-Q4_*.gguf >/dev/null 2>&1'
 check 'whisper.cpp CLI' test -x /opt/manny/whisper.cpp/build/bin/whisper-cli
 check 'multilingual Whisper model' test -r /opt/manny/models/ggml-base.bin
 check 'eSpeak NG' command -v espeak-ng
@@ -246,6 +250,18 @@ if curl -sf --max-time 5 "${MANNY_LLM_BASE_URL}/health" >/dev/null 2>&1; then
     ok 'llama-server answers a completion'
   else
     broken 'llama-server answers a completion' 'health passed but generation failed'
+  fi
+  # The core sends MANNY_LLM_MODEL as the model name. If the server answers to a
+  # different alias, the profile and the installed weights have drifted apart —
+  # the same class of mismatch that used to stop manny-llm from starting at all.
+  served="$(curl -sf --max-time 5 "${MANNY_LLM_BASE_URL}/v1/models" 2>/dev/null)"
+  if [[ -z "${served}" ]]; then
+    skip 'served model matches MANNY_LLM_MODEL' 'server did not list its models'
+  elif printf '%s' "${served}" | grep -qF "\"${MANNY_LLM_MODEL}\""; then
+    ok "served model matches MANNY_LLM_MODEL (${MANNY_LLM_MODEL})"
+  else
+    broken 'served model matches MANNY_LLM_MODEL' \
+      "core sends ${MANNY_LLM_MODEL}; server lists something else"
   fi
 else
   skip 'llama-server' "not responding on ${MANNY_LLM_BASE_URL}; start manny-llm first"

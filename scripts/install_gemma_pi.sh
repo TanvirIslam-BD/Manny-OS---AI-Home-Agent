@@ -7,43 +7,74 @@ llama_dir="/opt/manny/llama.cpp"
 
 # Variant selects the conversational model. 1b is text-only and pinned here.
 # 4b is multimodal, so it also answers questions about the camera view — it needs
-# a vision projector alongside the weights and a larger memory budget.
+# a vision projector alongside the weights and a larger memory budget. On a Pi 5
+# 4b generates at roughly a third of 1b's rate, so it is a vision choice, not a
+# conversation one.
 variant="${MANNY_GEMMA_VARIANT:-1b}"
 
-model_name="gemma-3-1b-it-Q4_K_M.gguf"
-model_url="https://huggingface.co/ggml-org/gemma-3-1b-it-GGUF/resolve/main/${model_name}"
-model_sha256="8ccc5cd1f1b3602548715ae25a66ed73fd5dc68a210412eea643eb20eb75a135"
+# Quantisation. Q4_K_M is the pinned, checksum-verified default. Q4_0 is faster on
+# this CPU: Cortex-A76 has dotprod, and llama.cpp repacks Q4_0 into a blocked GEMM
+# kernel that Q4_K_M never uses, which mostly shortens prompt processing. Nobody
+# has verified a Q4_0 checksum for this repo, so that path asks you for one.
+quant="${MANNY_GEMMA_QUANT:-q4_k_m}"
+
+case "${quant}" in
+  q4_k_m) quant_tag="Q4_K_M" ;;
+  q4_0) quant_tag="Q4_0" ;;
+  *)
+    printf 'Unknown MANNY_GEMMA_QUANT: %s (expected q4_k_m or q4_0)\n' "${quant}" >&2
+    exit 2
+    ;;
+esac
+if [[ "${variant}" != "1b" && "${variant}" != "4b" ]]; then
+  printf 'Unknown MANNY_GEMMA_VARIANT: %s (expected 1b or 4b)\n' "${variant}" >&2
+  exit 2
+fi
+
+model_alias="gemma-3-${variant}-it"
+model_name="${model_alias}-${quant_tag}.gguf"
+model_url="${MANNY_GEMMA_MODEL_URL:-}"
+model_sha256="${MANNY_GEMMA_MODEL_SHA256:-}"
 mmproj_name=""
 mmproj_url=""
 mmproj_sha256=""
 
+# The one combination whose checksum was verified before it was pinned.
+if [[ "${variant}" == "1b" && "${quant}" == "q4_k_m" && -z "${model_url}" ]]; then
+  model_url="https://huggingface.co/ggml-org/gemma-3-1b-it-GGUF/resolve/main/${model_name}"
+  model_sha256="8ccc5cd1f1b3602548715ae25a66ed73fd5dc68a210412eea643eb20eb75a135"
+fi
+
+# Everything else is unverified, and a downloaded model that nothing checks is a
+# supply-chain hole, so the installer refuses rather than skipping the check.
+if [[ -z "${model_url}" || -z "${model_sha256}" ]]; then
+  cat >&2 <<MSG
+gemma-3-${variant}-it ${quant_tag} has no checksum pinned in this repo. Supply one
+you have verified yourself:
+
+  MANNY_GEMMA_MODEL_URL     weights (${quant_tag} .gguf)
+  MANNY_GEMMA_MODEL_SHA256  sha256sum of the weights
+
+Download it once, run sha256sum yourself, then re-run with those values set.
+The pinned combination that needs no arguments is:
+  MANNY_GEMMA_VARIANT=1b MANNY_GEMMA_QUANT=q4_k_m
+MSG
+  exit 2
+fi
+
 if [[ "${variant}" == "4b" ]]; then
-  model_name="gemma-3-4b-it-Q4_K_M.gguf"
-  model_url="${MANNY_GEMMA_4B_URL:-}"
-  model_sha256="${MANNY_GEMMA_4B_SHA256:-}"
   mmproj_name="gemma-3-4b-it-mmproj-F16.gguf"
   mmproj_url="${MANNY_GEMMA_4B_MMPROJ_URL:-}"
   mmproj_sha256="${MANNY_GEMMA_4B_MMPROJ_SHA256:-}"
-  # The 1B checksum above was verified before it was pinned. These have not
-  # been, and a downloaded model that nothing verifies is a supply-chain hole,
-  # so the installer refuses rather than skipping the check.
-  if [[ -z "${model_url}" || -z "${model_sha256}" || -z "${mmproj_url}" || -z "${mmproj_sha256}" ]]; then
+  if [[ -z "${mmproj_url}" || -z "${mmproj_sha256}" ]]; then
     cat >&2 <<'MSG'
-The 4B multimodal variant needs URLs and SHA-256 checksums you have verified:
+The 4B multimodal variant also needs its vision projector, checksum included:
 
-  MANNY_GEMMA_4B_URL            weights (Q4_K_M .gguf)
-  MANNY_GEMMA_4B_SHA256         sha256sum of the weights
   MANNY_GEMMA_4B_MMPROJ_URL     vision projector (.gguf)
   MANNY_GEMMA_4B_MMPROJ_SHA256  sha256sum of the projector
-
-Download each once, run sha256sum yourself, then re-run with those values set.
 MSG
     exit 2
   fi
-elif [[ "${variant}" != "1b" ]]; then
-  printf 'Unknown MANNY_GEMMA_VARIANT: %s (expected 1b or 4b)
-' "${variant}" >&2
-  exit 2
 fi
 
 if [[ "$(uname -m)" != aarch64 ]] || ! grep -qi raspberry /proc/device-tree/model; then
@@ -97,4 +128,22 @@ if [[ -n "${mmproj_name}" ]]; then
 fi
 chmod 0755 "${llama_dir}/build/bin/llama-server"
 
-echo 'Gemma installed. Run install_systemd.sh, then explicitly enable manny-llm and manny-core.'
+# manny-llm.service reads this instead of hardcoding a filename. The unit and the
+# installed weights used to be edited separately, so a default install downloaded
+# 1B while the unit launched 4B and llama-server exited on a missing file.
+cat >/opt/manny/model.env <<EOF
+MANNY_LLM_MODEL_FILE=${model_dir}/${model_name}
+MANNY_LLM_MODEL_ALIAS=${model_alias}
+EOF
+chown root:manny /opt/manny/model.env
+chmod 0640 /opt/manny/model.env
+
+cat <<EOF
+Gemma installed: ${model_name}
+Recorded in /opt/manny/model.env, which manny-llm.service reads at start.
+
+Set MANNY_LLM_MODEL=${model_alias} in /opt/manny/.env so the core sends the same
+name the server answers to.
+
+Run install_systemd.sh, then explicitly enable manny-llm and manny-core.
+EOF
