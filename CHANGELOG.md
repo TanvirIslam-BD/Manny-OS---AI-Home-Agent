@@ -26,6 +26,7 @@ All notable changes to Manny OS are documented here.
 - Multilingual text and voice pipeline with BCP-47 metadata, same-language safe finance templates, whisper.cpp automatic STT detection, eSpeak NG output, browser language controls, and Pi installation
 - Selectable Gemma quantisation via `MANNY_GEMMA_QUANT`, with `q4_0` available for faster Cortex-A76 prompt processing once you supply a checksum you verified
 - `POST /api/voice/speak`, which synthesises a reply the browser has no voice for and returns it as WAV, so the desktop simulator speaks the languages its host operating system cannot
+- Typed replies stream sentence by sentence over the existing WebSocket as `agent.reply_chunk`, and the simulator shows them as they arrive. Streaming already existed but only the voice coordinator ever passed a listener, so typing was the slowest path in the product. Measured warm on a desktop CPU: first sentence in 3.3–5.8 s against 5.1–8.4 s for the whole reply, a 31–57% cut in perceived latency, largest on the longest answers. Finance replies are deliberately excluded — they come from validated MCP data in milliseconds, and a half-rendered figure is worse than a wait
 
 ### Changed
 
@@ -36,6 +37,7 @@ All notable changes to Manny OS are documented here.
 - The Ollama drop-in bounds the KV cache deliberately: one parallel slot, a 3,072-token context sized to Manny's measured prompt, and a q8_0 KV cache behind flash attention. Device profiles also carry four turns of history rather than six, since retrieval covers what falls out of the window
 - `docs/hardware.md` documents the 8 GB memory budget, what the configuration already does about it, and the ordered levers left — zram, dropping the kiosk, then more memory or a smaller tag
 - No systemd memory ceiling is set for the model: an E2B-class model's resident size depends on whether the runtime offloads per-layer embeddings, and a guessed ceiling either does nothing or OOM-kills it long after deployment
+- `llm_max_tokens` drops from 320 to 160 in every profile. Decode measured 16 tok/s on a desktop Ryzen 5600G with no GPU offload, and Google's published figure for this model class on a Pi 5 is 8 tok/s, so the old ceiling allowed a 20-second reply on a workstation and 40 on the device — longer than anyone waits for a companion to finish a sentence. It is not cut further because the device's default language is Bengali, whose script costs more tokens per word in this tokenizer than English, so a cap that reads as generous in English truncates in bn-BD
 - `MANNY_ESPEAK_NG_BINARY` falls back to whatever `espeak-ng` is on PATH when the configured path does not exist, so one profile covers the Pi's `/usr/bin/espeak-ng` and a desktop install anywhere else. An unresolvable name is passed through unchanged rather than substituted, so synthesis still fails loudly instead of speaking with some other program
 
 ### Fixed

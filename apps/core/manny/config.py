@@ -88,7 +88,14 @@ class Settings(BaseSettings):
     # partially resident mmap — fine once measured, not a default (ADR-021).
     llm_model: str = "gemma3n:e2b"
     llm_timeout_seconds: float = Field(default=60, gt=0, le=180)
-    llm_max_tokens: int = Field(default=320, ge=32, le=512)
+    # A ceiling on how long Manny can talk for, and so on how long the slowest reply
+    # takes. Decode measured 16 tok/s on a desktop Ryzen 5600G with no GPU offload, and
+    # Google's own Pi 5 figure for this model class is 8 tok/s, so 320 tokens is 20
+    # seconds here and 40 on the device — longer than anyone waits for a companion to
+    # finish a thought. 160 halves that. It is not cut further because the device's
+    # default language is Bengali, whose script costs more tokens per word than English
+    # in this tokenizer, so a cap that reads as generous in English truncates in bn-BD.
+    llm_max_tokens: int = Field(default=160, ge=32, le=512)
     llm_context_turns: int = Field(default=6, ge=1, le=12)
     # Speak each sentence as it is generated instead of waiting for the whole reply.
     # The wait is the largest remaining source of perceived latency: on four

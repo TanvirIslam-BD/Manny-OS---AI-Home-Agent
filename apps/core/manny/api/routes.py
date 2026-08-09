@@ -137,11 +137,37 @@ async def agent_query(body: AgentQuery, services: Services) -> AgentResponse:
     await services.state.transition(
         RuntimeState.THINKING, force=True, message="Checking Money Copilot"
     )
+    # Publish each sentence as the model produces it. Streaming already existed but
+    # only the voice coordinator ever passed a listener, so a typed question waited
+    # for the whole reply — measurably the worst case in the product, since decode
+    # runs at 16 tok/s on a desktop CPU and half that on the device. The wait is
+    # unchanged; what changes is that the user reads the first sentence while the
+    # rest is still being generated.
+    spoken_any = False
+
+    async def publish_chunk(piece: str) -> None:
+        nonlocal spoken_any
+        if not spoken_any:
+            # Same rule the coordinator follows: the face stops thinking once there
+            # is something to say, rather than at the end of the whole reply.
+            spoken_any = True
+            await services.state.transition(
+                RuntimeState.SPEAKING, force=True, message=piece[:160]
+            )
+        await services.events.publish("agent.reply_chunk", {"text": piece})
+
     try:
         # `authenticated` from the caller is advisory only. Anything able to reach
         # the loopback API could set it, so the verified unlock session decides.
         query = body.model_copy(update={"authenticated": services.security.is_unlocked()})
-        response = await services.agent.answer(query, privacy=services.state.snapshot.privacy)
+        response = await services.agent.answer(
+            query,
+            privacy=services.state.snapshot.privacy,
+            # Only a general-intent reply comes from the model. Finance answers are
+            # built from validated MCP data and arrive whole in milliseconds, so
+            # there is nothing to stream and nothing to gain.
+            on_reply_chunk=publish_chunk if services.settings.llm_stream_replies else None,
+        )
     except RuntimeError as exc:
         await services.state.transition(
             RuntimeState.ERROR, force=True, message="I couldn't validate that financial data"

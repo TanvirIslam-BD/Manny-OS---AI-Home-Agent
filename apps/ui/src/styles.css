@@ -414,6 +414,10 @@ svg { width: 1.3rem; height: 1.3rem; }
 .agent-answer strong { color: var(--teal); font-size: .65rem; }
 .agent-answer p { margin: 4px 0; color: #dbeaf5; font-size: .72rem; line-height: 1.45; }
 .agent-answer small { color: #5e829d; font-size: .55rem; }
+/* A reply the model is still writing. Dimmed and dashed so partial text is never
+   mistaken for a finished answer — which matters most for finance, where a truncated
+   figure would be worse than no figure. */
+.agent-answer.is-streaming { border-style: dashed; opacity: .78; }
 
 .device-panel { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 14px; display: flex; flex-direction: column; justify-content: center; gap: 7px; border: 1px solid rgba(37,196,255,.18); border-radius: 16px; background: rgba(5,18,31,.78); }
 .device-panel strong { font: 700 .82rem/1.25 Manrope, sans-serif; }

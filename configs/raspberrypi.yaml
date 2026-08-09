@@ -25,7 +25,7 @@ llm_base_url: http://127.0.0.1:11434
 # broker makes every MCP call (ADR-020).
 llm_model: gemma3n:e2b
 llm_timeout_seconds: 60
-llm_max_tokens: 320
+llm_max_tokens: 160
 # Four rather than six. Every turn is prompt tokens, which costs both prefill time
 # and KV cache on a board where memory is the binding constraint. Retrieval covers
 # what falls out of the window: MemoryStore.search pulls older facts back in when

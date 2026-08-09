@@ -104,6 +104,9 @@ function App() {
   const [deviceView, setDeviceView] = useState<DeviceView>('home')
   const [question, setQuestion] = useState('How\'s my budget?')
   const [agentResponse, setAgentResponse] = useState<AgentResponse | null>(null)
+  // Sentences of a reply the model has not finished writing. Shown until the complete
+  // answer arrives, so a slow generation reads as progress rather than as a hang.
+  const [streamingReply, setStreamingReply] = useState('')
   const [financeData, setFinanceData] = useState<FinanceDashboardData | null>(null)
   const [financeLoading, setFinanceLoading] = useState(false)
   const [financeError, setFinanceError] = useState<string | null>(null)
@@ -127,6 +130,9 @@ function App() {
       (event) => {
         if (event.type === 'system.state') setSnapshot(event.payload)
         if (event.type === 'mcp.status') setMcpStatus(event.payload)
+        if (event.type === 'agent.reply_chunk') {
+          setStreamingReply((sentences) => sentences + event.payload.text)
+        }
         // A reminder can be created by voice or by typing; refresh the list so
         // the Alerts screen reflects it without a reload.
         if (event.type === 'notification.created') {
@@ -253,14 +259,22 @@ function App() {
     if (!question.trim()) return
     setBusy(true)
     setError(null)
+    // Clear both so the previous answer does not sit under the new one's sentences
+    // while the model works.
+    setAgentResponse(null)
+    setStreamingReply('')
     try {
       const response = await askManny(
         question.trim(),
         language === 'auto' ? undefined : language,
       )
       setAgentResponse(response)
+      setStreamingReply('')
       await announce(response.answer, response.language)
     } catch (reason) {
+      // Half a reply next to an error reads as though the error interrupted speech
+      // Manny is still about to finish. It is not; the turn is over.
+      setStreamingReply('')
       setError(messageFrom(reason))
     } finally {
       setBusy(false)
@@ -513,6 +527,7 @@ function App() {
                 ? `Auto detect is on-device only — the browser microphone will listen in ${listeningLanguage}. Pick a language to change it.`
                 : `The microphone will listen in ${listeningLanguage}.`}
             </p>
+            {!agentResponse && streamingReply && <div className="agent-answer is-streaming" role="status" aria-busy="true"><strong>Manny · still writing</strong><p dir="auto">{streamingReply}</p></div>}
             {agentResponse && <div className="agent-answer" role="status"><strong>Manny · {agentResponse.language}</strong><p dir="auto">{agentResponse.answer}</p>{agentResponse.tool_name && <small>Verified via {agentResponse.tool_name}</small>}</div>}
           </section>
 
