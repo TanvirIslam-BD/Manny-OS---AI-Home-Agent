@@ -48,6 +48,15 @@ Status: Accepted
 
 Decision: Tool authorization and confirmation policy will be deterministic application code, not an LLM decision.
 
+Note, recorded because this is deliberately stricter than the prevailing pattern: Google's
+AI Edge Gallery — the reference implementation for on-device MCP — injects discovered tool
+schemas into the model's prompt and lets the model decide which tool to call, gated by
+per-invocation user permission, and describes that integration as experimental. Manny does
+not. The model returns an intent from a closed enum and the broker chooses the tool, because
+a device that reports account balances should not have the model deciding what to fetch.
+The cost is that Manny cannot use arbitrary discovered tools; the benefit is that a
+prompt-injected instruction cannot reach a tool call.
+
 ## ADR-009 — Local API exposure
 
 Status: Accepted

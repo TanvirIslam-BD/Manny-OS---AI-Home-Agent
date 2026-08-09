@@ -124,3 +124,15 @@ def test_raspberry_pi_is_deliberately_exempt_from_the_vault_requirement() -> Non
     settings = Settings(environment="raspberrypi", mcp_token_storage="json", _env_file=None)
 
     assert settings.mcp_token_storage == "json"
+
+
+def test_only_implemented_mcp_transports_are_accepted() -> None:
+    # local_stdio and local_http used to be accepted and unimplemented: anything but
+    # remote_http falls through to the mock client, so selecting them served demo data
+    # that looked live, which the honest-degradation invariant forbids. Rejecting them by
+    # name is the difference between a startup error and silently fabricated finance data.
+    for mode in ("local_stdio", "local_http"):
+        with pytest.raises(ValidationError, match="mcp_mode"):
+            Settings(mcp_mode=mode, _env_file=None)
+
+    assert Settings(mcp_mode="mock", _env_file=None).mcp_mode == "mock"

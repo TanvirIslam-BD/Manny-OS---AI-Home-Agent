@@ -336,7 +336,8 @@ Configuration:
 
 ```env
 MANNY_MCP_MODE=mock
-# mock | remote_http | local_stdio | local_http
+# mock | remote_http   (a stdio-only server needs a stdio-to-StreamableHTTP adapter
+#                       in front of it, with remote_http pointed at that)
 ```
 
 ---

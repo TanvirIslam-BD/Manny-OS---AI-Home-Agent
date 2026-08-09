@@ -52,7 +52,14 @@ class Settings(BaseSettings):
     audio_device: str | None = None
     led_state_path: Path | None = None
     display_brightness_path: Path | None = None
-    mcp_mode: Literal["mock", "remote_http", "local_stdio", "local_http"] = "mock"
+    # Only what is implemented. local_stdio and local_http were accepted values that
+    # nothing handled: lifecycle falls back to MockMCPClient for anything but
+    # remote_http, so setting either returned fabricated demo data while looking
+    # connected — the exact failure the honest-degradation invariant forbids. Pydantic
+    # now rejects them by name instead. A stdio-only MCP server can still be used by
+    # putting a stdio-to-StreamableHTTP adapter in front of it and pointing
+    # remote_http at that.
+    mcp_mode: Literal["mock", "remote_http"] = "mock"
     mcp_url: str = ""
     mcp_protocol_version: str = "2026-07-28"
     mcp_access_token: SecretStr | None = None
