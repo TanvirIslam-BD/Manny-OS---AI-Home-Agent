@@ -61,8 +61,14 @@ class DeterministicIntentModel:
 
     async def classify(self, text: str) -> AgentIntent:
         value = text.casefold()
-        if is_non_personal_education(text):
-            return "general"
+        # Checked before the educational guard: "what is this?" matches both, and
+        # only one of them can look at the object being asked about, so the keyword
+        # was unreachable.
+        #
+        # Deliberately not gated on the camera being available. Routing here when
+        # vision is off answers "I can't describe what I see yet", which is the
+        # honest answer; sending it to general conversation instead lets the model
+        # invent a description of a room it cannot see.
         if any(
             keyword in value
             for keyword in (
@@ -73,6 +79,8 @@ class DeterministicIntentModel:
             )
         ):
             return "describe_scene"
+        if is_non_personal_education(text):
+            return "general"
         if any(
             keyword in value
             for keyword in (

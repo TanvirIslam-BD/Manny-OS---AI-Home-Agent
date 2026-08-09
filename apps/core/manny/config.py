@@ -69,6 +69,10 @@ class Settings(BaseSettings):
     whisper_cpp_threads: int = Field(default=4, ge=1, le=16)
     whisper_cpp_timeout_seconds: float = Field(default=90, gt=0, le=300)
     espeak_ng_binary: Path = Path("/usr/bin/espeak-ng")
+    # Speaker identifier for backends that select one. eSpeak NG picks its voice from
+    # the language tag and ignores this; Kokoro requires an identifier from its own
+    # catalogue and cannot invent one, so it is left empty rather than guessed.
+    tts_voice: str = Field(default="", max_length=64)
     llm_backend: Literal["mock", "llama_cpp"] = "mock"
     llm_base_url: str = "http://127.0.0.1:8080"
     llm_model: str = "gemma-3-1b-it"

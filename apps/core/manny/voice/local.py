@@ -50,13 +50,25 @@ class MoonshineSpeechToText:
 
 
 class KokoroTextToSpeech:
-    """Kokoro KPipeline adapter producing mono signed 16-bit PCM."""
+    """Kokoro KPipeline adapter producing mono signed 16-bit PCM.
+
+    Kokoro selects a speaker by its own voice identifier, not by an arbitrary name.
+    The coordinator used to pass "manny", which eSpeak ignores and Kokoro cannot
+    resolve, so this backend could not work as it was wired. The identifier now
+    comes from MANNY_TTS_VOICE and the absence of one is reported here rather than
+    surfacing as a failure inside the library.
+    """
 
     def __init__(self, language: str = "a") -> None:
         self._language = language
         self._pipelines: dict[str, Any] = {}
 
     async def synthesize(self, text: str, voice: str, language: str = "en") -> AudioBuffer:
+        if not voice:
+            raise RuntimeError(
+                "Kokoro needs a voice identifier from its own catalogue; set "
+                "MANNY_TTS_VOICE to one the installed version publishes"
+            )
         return await asyncio.to_thread(self._synthesize_sync, text, voice, language)
 
     def _synthesize_sync(self, text: str, voice: str, language: str) -> AudioBuffer:

@@ -30,7 +30,9 @@ class HalfDuplexVoiceCoordinator:
         agent: RuleBasedAgent,
         state: StateMachine,
         speaker: AudioPlayback | None = None,
+        voice: str = "",
     ) -> None:
+        self._voice = voice
         self._stt = stt
         self._tts = tts
         self._vad = vad
@@ -115,7 +117,7 @@ class HalfDuplexVoiceCoordinator:
             RuntimeState.SPEAKING, force=True, message=response.answer[:160]
         )
         spoken = await self._tts.synthesize(
-            response.answer, voice="manny", language=response.language
+            response.answer, voice=self._voice, language=response.language
         )
         if self._speaker is not None:
             # Half-duplex: playback completes before the turn lock releases,

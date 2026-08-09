@@ -32,6 +32,17 @@ dev = [
 production = [
   "keyring>=25,<26",
 ]
+# Only needed when MANNY_PERSON_DETECTOR=opencv_hog. Headless because the device has
+# no use for OpenCV's GUI bindings and they pull in more than a kiosk should carry.
+vision = [
+  "opencv-python-headless>=4.10,<5",
+]
+# Moonshine and Kokoro are deliberately absent. Both are selectable STT/TTS backends
+# (ADR-014), but neither has a version verified against this project on ARM64, and
+# pinning one nobody has run would be a guess presented as a requirement — the same
+# reasoning that keeps unverified model checksums out of the installer. Install the
+# version you validated, then set MANNY_STT_BACKEND / MANNY_TTS_BACKEND. Each adapter
+# reports its own absence if the runtime is missing.
 
 [tool.hatch.build.targets.wheel]
 packages = ["apps/core/manny"]

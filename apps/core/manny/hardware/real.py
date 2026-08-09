@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import subprocess
 from collections.abc import AsyncGenerator, Sequence
 from dataclasses import dataclass
@@ -13,6 +14,7 @@ from manny.hardware.interfaces import HardwareBundle, LedState
 from manny.vision import Picamera2Adapter, build_person_detector
 from manny.voice.models import AudioBuffer
 
+logger = logging.getLogger(__name__)
 _SAMPLE_BYTES = 2
 _PROCESS_GRACE_SECONDS = 10.0
 
@@ -48,6 +50,20 @@ def _pcm_seconds(byte_count: int, sample_rate: int, channels: int) -> float:
     return byte_count / float(sample_rate * channels * _SAMPLE_BYTES)
 
 
+def _control_device(pcm_device: str) -> str:
+    """Turn a PCM device name into the control device `amixer` expects.
+
+    Capture and playback address a PCM ("hw:Loopback,0,0"); the mixer addresses the
+    card ("hw:Loopback"). Passing the PCM name to amixer is an error, so the
+    subdevice components are dropped, and plughw is a PCM-only wrapper with no
+    mixer of its own.
+    """
+    device = pcm_device.split(",", 1)[0]
+    if device.startswith("plughw:"):
+        return "hw:" + device.removeprefix("plughw:")
+    return device
+
+
 @dataclass(slots=True)
 class AlsaAudioInput:
     """Microphone capture through `arecord`, emitting signed 16-bit little-endian PCM."""
@@ -58,8 +74,24 @@ class AlsaAudioInput:
     channels: int = 1
 
     async def set_muted(self, muted: bool) -> None:
-        await _run("amixer", "-D", self.device, "sset", "Capture", "nocap" if muted else "cap")
+        # The flag is what actually mutes: capture() returns empty PCM while it is
+        # set, and nothing reaches the recogniser. The mixer call is an additional
+        # hardware mute, and it is best-effort on purpose — control names differ per
+        # card ("Capture", "Mic", none at all), so a card without the control used to
+        # raise CalledProcessError out of the API and leave the microphone live. A
+        # privacy control must not fail because a mixer name did not match.
         self.muted = muted
+        try:
+            await _run(
+                "amixer", "-D", _control_device(self.device),
+                "sset", "Capture", "nocap" if muted else "cap",
+            )
+        except Exception:
+            logger.info(
+                "no ALSA capture control on %s; relying on the software mute",
+                self.device,
+                exc_info=True,
+            )
 
     async def is_muted(self) -> bool:
         return self.muted
@@ -141,7 +173,16 @@ class AlsaAudioOutput:
 
     async def set_volume(self, value: float) -> None:
         percent = round(min(1.0, max(0.0, value)) * 100)
-        await _run("amixer", "-D", self.device, "sset", "Master", f"{percent}%")
+        # Same reasoning as capture mute: "Master" does not exist on every card, and
+        # a missing mixer control should not turn a volume change into a 500.
+        try:
+            await _run(
+                "amixer", "-D", _control_device(self.device), "sset", "Master", f"{percent}%"
+            )
+        except Exception:
+            logger.info(
+                "no ALSA Master control on %s; volume unchanged", self.device, exc_info=True
+            )
 
     async def play(self, audio: AudioBuffer) -> None:
         if not audio.pcm:
