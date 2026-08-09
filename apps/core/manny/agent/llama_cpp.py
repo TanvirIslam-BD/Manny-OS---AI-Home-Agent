@@ -276,26 +276,26 @@ class LlamaCppAgentModel:
         chunker = SentenceChunker()
         assembled: list[str] = []
         try:
-            async with httpx.AsyncClient(
-                timeout=self._timeout, transport=self._transport
-            ) as client:
-                async with client.stream("POST", self._url, json=streamed) as response:
-                    response.raise_for_status()
-                    async for line in response.aiter_lines():
-                        delta = _stream_delta(line)
-                        if not delta:
-                            continue
-                        assembled.append(delta)
-                        if field.complete:
-                            continue
-                        for piece in chunker.feed(field.feed(delta)):
-                            await on_reply_chunk(piece)
-                        if field.complete:
-                            # Say the last sentence now rather than waiting for the
-                            # remaining fields of a document nobody hears.
-                            trailing = chunker.flush()
-                            if trailing:
-                                await on_reply_chunk(trailing)
+            async with (
+                httpx.AsyncClient(timeout=self._timeout, transport=self._transport) as client,
+                client.stream("POST", self._url, json=streamed) as response,
+            ):
+                response.raise_for_status()
+                async for line in response.aiter_lines():
+                    delta = _stream_delta(line)
+                    if not delta:
+                        continue
+                    assembled.append(delta)
+                    if field.complete:
+                        continue
+                    for piece in chunker.feed(field.feed(delta)):
+                        await on_reply_chunk(piece)
+                    if field.complete:
+                        # Say the last sentence now rather than waiting for the
+                        # remaining fields of a document nobody hears.
+                        trailing = chunker.flush()
+                        if trailing:
+                            await on_reply_chunk(trailing)
         except httpx.HTTPError as exc:
             self._status = "unavailable"
             raise RuntimeError("Local Gemma is unavailable") from exc
