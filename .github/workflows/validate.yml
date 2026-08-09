@@ -14,6 +14,10 @@ jobs:
           python-version: '3.12'
       - run: python -m pip install -e '.[dev]'
       - run: bash -n scripts/*.sh
+      # bash -n only parses. These scripts provision the device as root: they download a
+      # binary, write systemd units and enable services, so unquoted expansions and
+      # unchecked failures matter more here than anywhere else in the repository.
+      - run: shellcheck --severity=warning scripts/*.sh
       - run: python -m ruff check apps/core mcp_servers tests
       - run: python -m mypy apps/core/manny
       - run: python -m pytest
