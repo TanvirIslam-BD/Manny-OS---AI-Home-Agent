@@ -322,7 +322,9 @@ svg { width: 1.3rem; height: 1.3rem; }
   cursor: pointer;
 }
 .ask-button svg { width: 14px; height: 14px; color: var(--cyan); }
-.ask-button:hover { border-color: var(--cyan); box-shadow: 0 0 18px rgba(35,180,255,.28); }
+@media (hover: hover) {
+  .ask-button:hover { border-color: var(--cyan); box-shadow: 0 0 18px rgba(35,180,255,.28); }
+}
 .ask-button:disabled { cursor: not-allowed; filter: saturate(.4); }
 .ask-button--listening { border-color: var(--cyan); animation: buttonPulse 1.2s ease-in-out infinite; }
 
@@ -337,7 +339,8 @@ svg { width: 1.3rem; height: 1.3rem; }
   border-top: 1px solid rgba(100, 164, 209, .09);
 }
 .screen__nav button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; color: #6e8494; border: 0; background: none; font-size: .46rem; cursor: pointer; }
-.screen__nav button:hover, .screen__nav .is-active { color: var(--blue); }
+.screen__nav .is-active { color: var(--blue); }
+@media (hover: hover) { .screen__nav button:hover { color: var(--blue); } }
 .screen__nav svg { width: 15px; height: 15px; }
 .screen__nav .nav-orb { width: 42px; height: 42px; align-self: center; justify-self: center; justify-content: center; color: #dbefff; border: 1px solid var(--blue); border-radius: 50%; background: radial-gradient(circle, #123c63, #06111f 66%); box-shadow: 0 0 16px color-mix(in srgb, var(--blue) 60%, transparent); transform: translateY(-3px); }
 .nav-orb span { font: 800 1rem Manrope, sans-serif; }
@@ -381,7 +384,9 @@ svg { width: 1.3rem; height: 1.3rem; }
 }
 .state-grid button { display: flex; align-items: center; gap: 7px; padding: 0 10px; text-align: left; }
 .state-grid button i { width: 6px; height: 6px; border-radius: 50%; background: #3e566a; }
-.state-grid button:hover, .segmented button:hover { color: #c9efff; border-color: rgba(32,185,255,.4); transform: translateY(-1px); }
+@media (hover: hover) {
+  .state-grid button:hover, .segmented button:hover { color: #c9efff; border-color: rgba(32,185,255,.4); transform: translateY(-1px); }
+}
 .state-grid button.is-selected, .segmented button.is-selected { color: #e4f9ff; border-color: rgba(31,194,255,.5); background: linear-gradient(180deg, rgba(17,67,104,.75), rgba(7,28,48,.9)); box-shadow: inset 0 0 18px rgba(32,185,255,.08); }
 .state-grid button.is-selected i { background: var(--cyan); box-shadow: 0 0 8px var(--cyan); }
 .state-grid button:disabled { cursor: wait; opacity: .6; }
@@ -626,6 +631,37 @@ svg { width: 1.3rem; height: 1.3rem; }
 .simulator-shell--kiosk .insights__list em, .simulator-shell--kiosk .alerts__list small { font-size: 2.2vmin; }
 .simulator-shell--kiosk .alerts__add input, .simulator-shell--kiosk .alerts__add select, .simulator-shell--kiosk .alerts__add button { min-height: 8vmin; font-size: 2.4vmin; }
 .card__refresh { min-width: 0; min-height: 0; padding: 2px 6px; color: #6d879c; border: 1px solid rgba(83,169,237,.2); border-radius: 6px; background: transparent; font-size: .47rem; text-transform: uppercase; letter-spacing: .045em; cursor: pointer; }
-.card__refresh:hover:not(:disabled) { color: var(--blue); border-color: rgba(59,157,255,.45); }
+@media (hover: hover) {
+  .card__refresh:hover:not(:disabled) { color: var(--blue); border-color: rgba(59,157,255,.45); }
+}
 .card__refresh:disabled { cursor: default; opacity: .6; }
 .simulator-shell--kiosk .card__refresh { padding: 1vmin 1.6vmin; font-size: 2vmin; }
+
+/* On-screen keyboard. The kiosk has a touchscreen and Chromium on Linux ships no
+   virtual keyboard, so this is the only way to reach a text field there. Keys stay
+   at the 44px touch target the rest of the UI uses. */
+.osk { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; padding: 6px; border: 1px solid rgba(59,157,255,.2); border-radius: 12px; background: rgba(6,16,26,.9); touch-action: manipulation; }
+.osk__row { display: flex; gap: 4px; justify-content: center; }
+.osk__key {
+  flex: 1 1 0;
+  min-width: 44px; min-height: 44px;
+  padding: 0 4px;
+  color: #dff9ff;
+  border: 1px solid rgba(40,197,255,.28);
+  border-radius: 8px;
+  background: #0a2942;
+  font-size: .8rem;
+  cursor: pointer;
+  /* A long press on a key must not select its label or open a context menu. */
+  user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+}
+.osk__key--wide { flex: 1.4 1 0; font-size: .62rem; }
+.osk__key--space { flex: 3 1 0; font-size: .62rem; }
+.osk__key.is-active { border-color: var(--cyan); background: #10405f; }
+.osk__key:active { background: #12507a; }
+
+/* Hover is a mouse affordance. Without this guard a tap leaves the key, and the
+   nav tabs, stuck in their hover state until something else is tapped. */
+@media (hover: hover) {
+  .osk__key:hover { border-color: var(--cyan); }
+}

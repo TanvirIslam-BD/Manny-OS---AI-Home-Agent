@@ -1,6 +1,7 @@
-import { useState, type FormEvent } from 'react'
+import { useRef, useState, type FormEvent } from 'react'
 import { completeReminder, createReminder } from '../api/client'
 import type { Reminder } from '../types'
+import OnScreenKeyboard from './OnScreenKeyboard'
 
 function whenLabel(due: string): string {
   const date = new Date(due)
@@ -26,6 +27,8 @@ export default function AlertsView({
   const [title, setTitle] = useState('')
   const [minutes, setMinutes] = useState('60')
   const [working, setWorking] = useState(false)
+  const titleRef = useRef<HTMLInputElement | null>(null)
+  const [showKeyboard, setShowKeyboard] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
 
   async function add(event: FormEvent<HTMLFormElement>) {
@@ -89,6 +92,7 @@ export default function AlertsView({
           maxLength={160}
           onChange={(event) => setTitle(event.target.value)}
           placeholder="Remind me to…"
+          ref={titleRef}
           value={title}
         />
         <select aria-label="When" value={minutes} onChange={(event) => setMinutes(event.target.value)}>
@@ -98,7 +102,15 @@ export default function AlertsView({
           <option value="1440">Tomorrow</option>
         </select>
         <button disabled={busy || working || !title.trim()} type="submit">Add</button>
+        <button aria-label="Show on-screen keyboard" aria-pressed={showKeyboard} type="button" onClick={() => setShowKeyboard(!showKeyboard)}>⌨</button>
       </form>
+      {showKeyboard && (
+        <OnScreenKeyboard
+          label="Reminder keyboard"
+          onDone={() => setShowKeyboard(false)}
+          target={titleRef}
+        />
+      )}
       {message && <small className="alerts__message">{message}</small>}
     </section>
   )

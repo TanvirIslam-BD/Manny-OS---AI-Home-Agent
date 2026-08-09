@@ -7,7 +7,10 @@ Requires=manny-core.service
 Type=simple
 User=manny
 Environment=DISPLAY=:0
-ExecStart=/usr/bin/chromium --kiosk --no-first-run http://127.0.0.1:8765
+# Touch gestures that make sense in a browser are hazards on an appliance: a
+# horizontal swipe navigates back out of the app, and a pinch leaves the UI zoomed
+# with no way to reset it without a keyboard.
+ExecStart=/usr/bin/chromium --kiosk --no-first-run --disable-pinch --overscroll-history-navigation=0 http://127.0.0.1:8765
 Restart=on-failure
 RestartSec=3
 NoNewPrivileges=true

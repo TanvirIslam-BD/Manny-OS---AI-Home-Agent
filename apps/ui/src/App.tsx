@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import {
   connectEvents,
   connectMcp,
@@ -26,6 +26,7 @@ import { Icon } from './components/Icons'
 import MannyFace from './components/MannyFace'
 import PasscodePanel from './components/PasscodePanel'
 import InsightsView from './components/InsightsView'
+import OnScreenKeyboard from './components/OnScreenKeyboard'
 import AlertsView from './components/AlertsView'
 import type { AgentResponse, FinanceDashboardData, MCPStatus, MemoryStats, PublicSettings, Reminder, SecurityStatus, RuntimeSnapshot, RuntimeState } from './types'
 import { listenOnce, speak, supportsBrowserVoice } from './voice/browser'
@@ -90,6 +91,10 @@ const LANGUAGE_OPTIONS = [
 type DeviceView = 'home' | 'insights' | 'alerts' | 'settings'
 
 function App() {
+  const questionRef = useRef<HTMLInputElement | null>(null)
+  // Off by default: the kiosk display is small and a permanent keyboard would cover
+  // the answer. Voice is the primary input; this is the fallback.
+  const [showKeyboard, setShowKeyboard] = useState(false)
   const [snapshot, setSnapshot] = useState(initialState)
   const [socketConnected, setSocketConnected] = useState(false)
   const [mcpStatus, setMcpStatus] = useState(initialMcpStatus)
@@ -474,7 +479,14 @@ function App() {
                 </select>
               </div>
               <label htmlFor="manny-question">Question</label>
-              <div><input dir="auto" id="manny-question" value={question} maxLength={500} onChange={(event) => setQuestion(event.target.value)} /><button disabled={busy || !question.trim()} type="submit">Ask</button><button aria-label="Use desktop microphone" disabled={busy || !supportsBrowserVoice()} type="button" onClick={() => void startVoiceTurn()}><Icon name="mic" /></button></div>
+              <div><input dir="auto" id="manny-question" ref={questionRef} value={question} maxLength={500} onChange={(event) => setQuestion(event.target.value)} /><button disabled={busy || !question.trim()} type="submit">Ask</button><button aria-label="Use desktop microphone" disabled={busy || !supportsBrowserVoice()} type="button" onClick={() => void startVoiceTurn()}><Icon name="mic" /></button><button aria-label="Show on-screen keyboard" aria-pressed={showKeyboard} type="button" onClick={() => setShowKeyboard(!showKeyboard)}>⌨</button></div>
+              {showKeyboard && (
+                <OnScreenKeyboard
+                  label="Question keyboard"
+                  onDone={() => setShowKeyboard(false)}
+                  target={questionRef}
+                />
+              )}
             </form>
             <p className="agent-query__hint">
               {language === 'auto'
