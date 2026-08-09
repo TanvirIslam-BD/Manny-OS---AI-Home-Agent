@@ -229,3 +229,41 @@ earlier reasoning that storage speed could not affect a bandwidth-bound decode.
 
 Reverting means restoring `install_gemma_pi.sh`, `manny-llm.service` and the
 `model.env` mechanism from history, and pointing `llm_base_url` back at port 8080.
+
+## ADR-021 — 8 GB board with NVMe, and mmap as the mechanism that makes it fit
+
+Status: Accepted
+
+Decision: Manny targets a Raspberry Pi 5 8 GB with an NVMe drive, running
+`gemma4:e2b` whose model layer is 6.67 GB. NVMe is a requirement, not an upgrade.
+
+Rationale: the model file is larger than the memory left for it — roughly 6.3 GB of
+7.8 GB usable, once the desktop session, Chromium kiosk, core and whisper have taken
+their share. It loads anyway because Ollama mmaps its weights, so what must be
+resident is the hot working set rather than the whole file, and for a model with
+around 2B active parameters that is far smaller. A 16 GB board would fit it outright
+at identical speed, since memory bandwidth is unchanged; 8 GB with NVMe was chosen
+instead, which makes the offloading mechanism load-bearing rather than incidental.
+
+Consequences:
+
+Storage is in the inference path. Cold pages are faulted during generation, so read
+latency shows up as pauses mid-sentence. NVMe delivers 400+ MB/s random read; a
+microSD card delivers 10–40 MB/s, which is slow enough that a fault reads as a hang.
+The installer warns when the model store is not on NVMe and bring-up fails the check.
+
+mmap must stay enabled. `OLLAMA_NO_MMAP` would require the whole file resident, which
+this board cannot do, so the drop-in carries a comment against setting it. Someone
+disabling it to fix an unrelated symptom would produce a device that cannot load its
+model at all.
+
+Memory headroom is part of the design. zram provides compressed swap in RAM so
+Chromium's anonymous pages can be evicted without costing the page cache that holds
+the model, and `vm.swappiness=100` biases the kernel toward doing that rather than
+dropping model pages. SD-card swap is disabled outright, since a fault there during
+generation is indistinguishable from a hang.
+
+There is little margin. If measurement on the device shows the working set is larger
+than hoped, the levers in order are dropping the Chromium kiosk for about 1.5 GB,
+switching to `gemma3n:e2b` at 5.24 GB — one environment variable — or moving to a
+16 GB board. `ollama ps` is what decides.

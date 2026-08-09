@@ -1,6 +1,6 @@
 # Raspberry Pi Hardware Integration
 
-Manny targets Raspberry Pi 5 8 GB on 64-bit Raspberry Pi OS. No final peripheral identifiers or GPIO mappings are encoded in source.
+Manny targets Raspberry Pi 5 8 GB **with NVMe** on 64-bit Raspberry Pi OS. The NVMe drive is a requirement rather than an upgrade: the conversational model is larger than the RAM left for it and depends on being paged from fast storage (ADR-021). No final peripheral identifiers or GPIO mappings are encoded in source.
 
 Device configuration includes `MANNY_AUDIO_DEVICE`, optional LED/display sysfs paths, camera privacy state, and the selected local STT/TTS/LLM backends.
 
@@ -74,20 +74,28 @@ What the configuration already does to help:
 - `OLLAMA_MAX_LOADED_MODELS=1` — vision and conversation share one model, so nothing
   should ever want a second.
 
-If `ollama ps` still reports too much, in order of preference:
+`install_ollama_pi.sh` already configures the memory side of this, because on this
+board it is part of the design rather than a remedy:
 
-1. **zram.** Compressed swap in RAM gives Chromium's idle pages somewhere cheap to
-   go. Never let model weights reach SD-card swap; random reads there are 10–40 MB/s
-   and generation stops being conversational.
-   ```bash
-   sudo apt-get install -y zram-tools
-   sudo systemctl restart zramswap
-   ```
-2. **Drop the kiosk.** `systemctl disable --now manny-kiosk` frees roughly 1.5 GB and
+- **zram** at 25% with zstd, so Chromium's anonymous pages can be evicted into
+  compressed RAM instead of costing the page cache that holds the model. Sized
+  conservatively: zram's own compressed pages occupy RAM, so a larger device is not
+  free, and page cache is what this device is short of.
+- **`vm.swappiness=100`**, biasing the kernel toward evicting anonymous pages rather
+  than dropping mmapped model pages — the first costs a compressed copy, the second
+  costs a disk fault mid-generation.
+- **SD-card swap disabled.** zram replaces `dphys-swapfile` rather than joining it. A
+  fault to the card during generation is indistinguishable from a hang.
+- **mmap left enabled.** Never set `OLLAMA_NO_MMAP`: it would require the whole 6.67 GB
+  resident, which this board cannot do.
+
+If `ollama ps` still reports more than the board can hold, the levers in order are:
+
+1. **Drop the kiosk.** `systemctl disable --now manny-kiosk` frees roughly 1.5 GB, and
    the UI still works from another machine's browser on the same network.
-3. **More memory, or less model.** A 16 GB board keeps the same bandwidth — it fits,
-   it does not speed up — or set `MANNY_OLLAMA_MODEL` to a smaller tag, which is now
-   one variable and a pull.
+2. **A smaller model.** `MANNY_OLLAMA_MODEL=gemma3n:e2b` is 5.24 GB, the previous
+   generation of the same architecture — one variable and a pull.
+3. **A 16 GB board.** It fits outright, at the same speed; bandwidth is unchanged.
 
 Storage is part of this. A partially offloaded model faults to disk during
 generation, so NVMe belongs in the inference path: roughly 400+ MB/s random read

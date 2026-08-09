@@ -99,6 +99,35 @@ check 'whisper.cpp CLI' test -x /opt/manny/whisper.cpp/build/bin/whisper-cli
 check 'multilingual Whisper model' test -r /opt/manny/models/ggml-base.bin
 check 'eSpeak NG' command -v espeak-ng
 
+
+section 'Memory and storage'
+# This device runs a model larger than the RAM left for it, which only works
+# because Ollama mmaps its weights: the resident set is the hot working set and
+# cold pages are faulted from storage. Three things have to hold for that to be
+# fast rather than a hang (ADR-021).
+store="$(findmnt -no SOURCE --target /usr/share/ollama 2>/dev/null || true)"
+if [[ -z "${store}" ]]; then
+  skip 'model store on NVMe' 'Ollama model store not present yet'
+elif [[ "${store}" == *nvme* ]]; then
+  ok "model store on NVMe (${store})"
+else
+  broken 'model store on NVMe' \
+    "${store} is not NVMe; cold-page faults during generation will stall"
+fi
+# zram gives Chromium's idle pages somewhere cheap to go, so the page cache keeps
+# the model weights instead of losing them to the browser.
+if [[ -n "$(zramctl --noheadings 2>/dev/null)" ]]; then
+  ok 'zram active'
+else
+  absent 'zram active'
+fi
+# Swap on the SD card is worse than none: a fault mid-generation reads as a hang.
+if swapon --show=NAME --noheadings 2>/dev/null | grep -q mmcblk; then
+  broken 'no swap on the SD card' 'swap is on the SD card; disable dphys-swapfile'
+else
+  ok 'no swap on the SD card'
+fi
+
 if (( quick == 1 )); then
   section 'Summary'
   printf '  %s missing\n' "${missing}"

@@ -2,6 +2,7 @@
 
 The following remain unresolved and must not be encoded as permanent hardware facts:
 
+- The board is a Raspberry Pi 5 8 GB with NVMe (ADR-021). There is little memory margin: the model occupies 6.67 GB on disk against roughly 6.3 GB of RAM left for it, so it runs only as a mmapped working set paged from NVMe. Whether that working set is small enough in practice is unmeasured until `ollama ps` is read on the device.
 - Final display manufacturer, native resolution, touch interface, and rotation are not selected.
 - Final camera model, field of view, and enclosure position require validation.
 - Final microphone array, speaker, amplifier, and selectable device identifiers are unknown.

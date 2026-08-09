@@ -94,6 +94,10 @@ Environment=OLLAMA_CONTEXT_LENGTH=3072
 # it for no quality change worth measuring at this size.
 Environment=OLLAMA_FLASH_ATTENTION=1
 Environment=OLLAMA_KV_CACHE_TYPE=q8_0
+# Do not add OLLAMA_NO_MMAP. On an 8 GB board the model file is larger than the RAM
+# left for it, and mmap is the only reason it loads at all: the resident set becomes
+# the hot working set instead of the whole file, with cold pages served from NVMe
+# (ADR-021). Disabling it turns a working device into one that cannot load its model.
 # Keep the model resident between turns. Reloading several gigabytes mid-conversation
 # is a multi-second stall on this hardware, which is the failure that made a pinned
 # llama-server predictable and a model manager not.
@@ -132,6 +136,31 @@ EOF
   echo 'The archive shipped no unit, so a minimal one was installed.'
 fi
 
+# Compressed swap in RAM. On an 8 GB board the model's page cache competes with
+# Chromium's heap, and zram gives anonymous pages somewhere cheap to go so the cache
+# keeps the weights. Sized conservatively on purpose: zram's compressed pages occupy
+# RAM too, so a larger device is not free, and page cache is what this device needs.
+if [[ "${MANNY_SKIP_ZRAM:-0}" != 1 ]]; then
+  apt-get install -y --no-install-recommends zram-tools
+  cat >/etc/default/zramswap <<'EOF'
+ALGO=zstd
+PERCENT=25
+EOF
+  # Swapping anonymous pages into zram is cheap; dropping mmapped model pages costs a
+  # disk fault mid-generation. Bias the kernel accordingly.
+  cat >/etc/sysctl.d/60-manny-memory.conf <<'EOF'
+vm.swappiness=100
+EOF
+  sysctl --system >/dev/null 2>&1 || true
+  systemctl restart zramswap 2>/dev/null || systemctl restart zramswap.service 2>/dev/null || true
+  # Swap on the SD card is worse than no swap: random reads there are slow enough that
+  # a fault during generation reads as a hang. zram replaces it, it does not join it.
+  if systemctl is-enabled dphys-swapfile >/dev/null 2>&1; then
+    systemctl disable --now dphys-swapfile
+    echo 'Disabled dphys-swapfile: SD-card swap during generation reads as a hang.'
+  fi
+fi
+
 systemctl daemon-reload
 systemctl enable --now ollama
 
@@ -152,6 +181,19 @@ Check the name with:
 then re-run with MANNY_OLLAMA_MODEL set to a tag the registry publishes.
 MSG
   exit 1
+fi
+
+store_device="$(findmnt -no SOURCE --target /usr/share/ollama 2>/dev/null || true)"
+if [[ "${store_device}" == *mmcblk* ]]; then
+  cat >&2 <<MSG
+
+WARNING: the model store is on ${store_device}, an SD card.
+
+This configuration depends on mmap: the model is larger than the RAM left for it, so
+cold pages are faulted from storage during generation. On an SD card those reads are
+10-40 MB/s and generation will stall unpredictably. Move /usr/share/ollama to NVMe
+(ADR-021).
+MSG
 fi
 
 resident="$(ollama ps 2>/dev/null | tail -n +2 || true)"
