@@ -1,8 +1,10 @@
 """Voice adapters arrive in Phase 3."""
 
 from manny.voice.coordinator import HalfDuplexVoiceCoordinator, VoiceBusyError
+from manny.voice.endpointing import UtteranceRecorder
 from manny.voice.interfaces import (
     AudioCapture,
+    AudioFrameSource,
     AudioPlayback,
     SpeechToText,
     TextToSpeech,
@@ -26,6 +28,7 @@ __all__ = [
     "DEFAULT_PHRASES",
     "PhraseWakeWord",
     "AudioCapture",
+    "AudioFrameSource",
     "AudioPlayback",
     "EnergyVoiceActivity",
     "HalfDuplexVoiceCoordinator",
@@ -38,6 +41,7 @@ __all__ = [
     "MoonshineSpeechToText",
     "SpeechToText",
     "TextToSpeech",
+    "UtteranceRecorder",
     "Transcript",
     "VoiceActivityDetector",
     "VoiceBusyError",

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import subprocess
-from collections.abc import Sequence
+from collections.abc import AsyncIterator, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -83,6 +83,54 @@ class AlsaAudioInput:
             timeout_seconds=duration + _PROCESS_GRACE_SECONDS,
         )
         return AudioBuffer(pcm=pcm, sample_rate=self.sample_rate, channels=self.channels)
+
+    async def stream(self, frame_seconds: float) -> AsyncIterator[AudioBuffer]:
+        """Read the microphone continuously in small frames.
+
+        One long-lived `arecord` rather than a subprocess per chunk. The old
+        fixed-length capture left an ALSA open/close and an idle gap between
+        chunks, so speech that straddled a boundary was lost outright; here the
+        stream is unbroken for as long as the caller keeps reading.
+        """
+        if self.muted:
+            return
+        frame_bytes = max(
+            2, int(self.sample_rate * self.channels * _SAMPLE_BYTES * frame_seconds)
+        )
+        frame_bytes -= frame_bytes % (self.channels * _SAMPLE_BYTES)
+        process = await asyncio.create_subprocess_exec(
+            "arecord",
+            "-D", self.device,
+            "-t", "raw",
+            "-f", "S16_LE",
+            "-r", str(self.sample_rate),
+            "-c", str(self.channels),
+            "-q",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.DEVNULL,
+        )
+        stdout = process.stdout
+        if stdout is None:  # pragma: no cover - PIPE always provides one
+            raise RuntimeError("arecord produced no output stream")
+        try:
+            while True:
+                try:
+                    pcm = await stdout.readexactly(frame_bytes)
+                except asyncio.IncompleteReadError:
+                    return
+                yield AudioBuffer(
+                    pcm=pcm, sample_rate=self.sample_rate, channels=self.channels
+                )
+        finally:
+            # The caller stops reading as soon as the utterance ends, so the
+            # recorder must be torn down here or every turn would leak one.
+            if process.returncode is None:
+                process.terminate()
+                try:
+                    await asyncio.wait_for(process.wait(), timeout=2.0)
+                except TimeoutError:
+                    process.kill()
+                    await process.wait()
 
 
 @dataclass(slots=True)

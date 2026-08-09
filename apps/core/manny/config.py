@@ -88,6 +88,17 @@ class Settings(BaseSettings):
     voice_capture_seconds: float = Field(default=3.0, ge=1, le=15)
     voice_vad_threshold: float = Field(default=0.02, gt=0, le=1)
 
+    # End the utterance on the speaker rather than on a clock. Without this the
+    # recorder stops after voice_capture_seconds, which truncates any question
+    # longer than the window and makes every short one wait out the remainder.
+    # Recorders that cannot stream frames keep using the fixed window.
+    voice_endpointing_enabled: bool = True
+    voice_frame_seconds: float = Field(default=0.1, ge=0.02, le=0.5)
+    # How much trailing silence ends a turn. Too short and Manny interrupts a pause
+    # for thought; too long and every answer feels late.
+    voice_silence_hold_seconds: float = Field(default=0.8, ge=0.2, le=3)
+    voice_max_utterance_seconds: float = Field(default=12.0, ge=2, le=30)
+
     camera_enabled: bool = True
     vision_language_backend: Literal["none", "llama_cpp"] = "none"
     # A second llama-server: one instance serves one model, and a vision-capable

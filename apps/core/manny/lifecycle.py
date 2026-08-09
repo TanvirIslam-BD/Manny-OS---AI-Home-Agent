@@ -31,6 +31,7 @@ from manny.voice import (
     MockVoiceActivity,
     MoonshineSpeechToText,
     PhraseWakeWord,
+    UtteranceRecorder,
     SpeechToText,
     TextToSpeech,
     VoiceActivityDetector,
@@ -355,6 +356,20 @@ def build_services(settings: Settings) -> RuntimeServices:
                 # Same detector the coordinator uses, so a silent chunk is rejected
                 # before recognition rather than after it.
                 vad=vad,
+                recorder=(
+                    UtteranceRecorder(
+                        # Frames are far shorter than the detector's default duration
+                        # floor, which would reject every one of them.
+                        EnergyVoiceActivity(
+                            threshold=settings.voice_vad_threshold, minimum_seconds=0.0
+                        ),
+                        silence_hold_seconds=settings.voice_silence_hold_seconds,
+                        max_utterance_seconds=settings.voice_max_utterance_seconds,
+                    )
+                    if settings.voice_endpointing_enabled
+                    else None
+                ),
+                frame_seconds=settings.voice_frame_seconds,
             )
             if settings.voice_loop_active
             else None

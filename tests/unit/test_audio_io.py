@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import struct
+from collections.abc import AsyncIterator
 from math import pi, sin
 
 import pytest
@@ -21,6 +22,7 @@ from manny.voice import (
     MockTextToSpeech,
     MockVoiceActivity,
     Transcript,
+    UtteranceRecorder,
     VoiceLoop,
 )
 
@@ -246,6 +248,45 @@ class CountingMicrophone:
         del seconds
         self.captures += 1
         return AudioBuffer(pcm=self.pcm)
+
+
+class BrokenFrameSource:
+    """A recorder that advertises streaming and then fails at it."""
+
+    def __init__(self, pcm: bytes) -> None:
+        self.pcm = pcm
+        self.fallbacks = 0
+
+    async def is_muted(self) -> bool:
+        return False
+
+    async def capture(self, seconds: float) -> AudioBuffer:
+        del seconds
+        self.fallbacks += 1
+        return AudioBuffer(pcm=self.pcm)
+
+    def stream(self, frame_seconds: float) -> AsyncIterator[AudioBuffer]:
+        del frame_seconds
+        raise OSError("arecord is unavailable")
+
+
+async def test_a_broken_stream_falls_back_instead_of_going_deaf() -> None:
+    # A device that stops listening is worse than one that clips a long question,
+    # so a failed stream degrades to fixed-length capture.
+    coordinator, state = build_coordinator(MockAudioOutput())
+    microphone = BrokenFrameSource(b"how is my budget")
+    loop = VoiceLoop(
+        microphone,  # type: ignore[arg-type]
+        coordinator,
+        state,
+        recorder=UtteranceRecorder(MockVoiceActivity()),
+    )
+
+    result = await loop.poll_once()
+
+    assert result is not None
+    assert result.transcript.text == "how is my budget"
+    assert microphone.fallbacks == 1
 
 
 async def test_the_loop_does_not_record_over_a_running_turn() -> None:
