@@ -25,7 +25,7 @@ These rules are architectural constraints, not optional conventions:
   inference one: tool results come from the configured remote server, prompts never do.
 - All MCP calls pass through the deterministic policy broker and explicit tool allowlist.
 - Manny does not expose payment, transfer, trading, or other irreversible financial actions.
-- Local services bind to loopback by default. Do not expose the API or llama.cpp server to a
+- Local services bind to loopback by default. Do not expose the API or the Ollama daemon to a
   network without adding authentication and updating the threat model.
 - Camera processing is presence-oriented. Face recognition and identity storage are disabled.
 - Secrets, tokens, models, local databases, logs, and `.env` files must remain outside Git.
@@ -41,7 +41,7 @@ These rules are architectural constraints, not optional conventions:
   authoritative application state machine
 - Official MCP Python SDK v2 client using Streamable HTTP and OAuth 2.1 authorization
 - Validated live budget/category dashboard with disclosed cache age during outages
-- Local Gemma 3 1B IT companion through a loopback-only llama.cpp server
+- Local `gemma4:e2b` companion, text and image, through a loopback-only Ollama daemon
 - Multilingual typed and spoken interaction with automatic language detection
 - Local Whisper speech-to-text and eSpeak NG text-to-speech on Raspberry Pi
 - Browser microphone, speech synthesis, and camera presence simulation on desktop
@@ -62,7 +62,7 @@ Authoritative state machine ───────► UI expression / LEDs / disp
         │
         ├──► Voice: Whisper STT ─► language tag ─► agent ─► eSpeak/browser TTS
         │
-        ├──► General conversation ─► local Gemma through llama.cpp
+        ├──► General conversation ─► local model through Ollama
         │
         └──► Finance intent
                 │
@@ -79,7 +79,7 @@ request path is:
 
 1. Accept text or transcribed speech and attach a detected language.
 2. Classify cancellation, device controls, reminder requests, finance intent, or general chat.
-3. Route general chat to local Gemma; route finance intent through policy and MCP.
+3. Route general chat to the local model; route finance intent through policy and MCP.
 4. Validate external data against typed contracts before formatting it for the user.
 5. Update the state machine and publish an event to the UI/device adapters.
 6. Speak the same safe response in the selected language when voice output is enabled.
@@ -90,7 +90,7 @@ request path is:
 Manny-OS---AI-Home-Agent/
 ├── apps/
 │   ├── core/manny/             Python runtime package
-│   │   ├── agent/              Intent routing, Gemma/llama.cpp client, agent models
+│   │   ├── agent/              Intent routing, Ollama client, agent models
 │   │   ├── api/                REST routes and WebSocket event hub
 │   │   ├── hardware/           Hardware protocols plus mock and real adapters
 │   │   ├── mcp/                MCP clients, OAuth/token storage, contracts, validation
@@ -111,8 +111,8 @@ Manny-OS---AI-Home-Agent/
 ├── configs/                    Development, production, and Raspberry Pi profiles
 ├── docs/                       Architecture, hardware, MCP, privacy, security, operations
 ├── mcp_servers/manny_local/    Local mock MCP server for deterministic development
-├── scripts/                    Setup, validation, release, Pi, Gemma, and voice tooling
-├── systemd/                    Core API, local LLM, and kiosk service definitions
+├── scripts/                    Setup, validation, release, Pi, Ollama, and voice tooling
+├── systemd/                    Core API and kiosk service definitions
 ├── tests/
 │   ├── contract/               MCP and boundary contract tests
 │   ├── hardware/               Adapter behavior tests
@@ -135,7 +135,7 @@ Manny-OS---AI-Home-Agent/
 | Goal | Start here | Also inspect |
 | --- | --- | --- |
 | Change conversation or intent routing | `apps/core/manny/agent/runtime.py` | `agent/models.py`, `policy/`, agent tests |
-| Change local model behavior | `apps/core/manny/agent/llama_cpp.py` | profile YAML, LLM system prompt tests |
+| Change local model behavior | `apps/core/manny/agent/ollama.py` | profile YAML, LLM system prompt tests |
 | Add or change an MCP tool | `apps/core/manny/mcp/` | `policy/`, `docs/mcp-contract.md`, contract tests |
 | Add a REST or WebSocket feature | `apps/core/manny/api/` | `lifecycle.py`, state and integration tests |
 | Change a device expression/state | `apps/core/manny/state/` | `apps/ui/src/`, hardware adapters |
@@ -160,7 +160,7 @@ Select a profile with `MANNY_CONFIG_PROFILE`:
 | --- | --- |
 | `configs/development.yaml` | Desktop simulator, mock hardware, local development |
 | `configs/production.yaml` | Hardened device defaults and production storage |
-| `configs/raspberrypi.yaml` | Raspberry Pi 5 hardware, local Gemma, voice, kiosk |
+| `configs/raspberrypi.yaml` | Raspberry Pi 5 hardware, local model, voice, kiosk |
 
 Copy `.env.example` for desktop development. For a Pi installation, copy
 `configs/raspberrypi.env.example` to `/opt/manny/.env` and edit it on the device. Never commit
@@ -172,7 +172,7 @@ Important local services and default ports:
 | --- | --- | --- |
 | Manny API | `http://127.0.0.1:8765` | FastAPI, REST, WebSocket, and built UI |
 | Vite UI | `http://127.0.0.1:5173` | Development-only simulator server |
-| llama.cpp | `http://127.0.0.1:8080` | OpenAI-compatible local Gemma endpoint |
+| Ollama | `http://127.0.0.1:11434` | OpenAI-compatible local model endpoint, text and vision |
 | Money Copilot MCP | configured HTTPS URL | Remote Streamable HTTP MCP server |
 
 Example MCP configuration:
@@ -241,16 +241,17 @@ Useful commands:
 | `make test` | Run the Python test suite |
 | `make build` | Build the production UI |
 
-### Local Gemma on Windows
+### Local model on Windows
+
+Install Ollama for Windows from its own installer, then:
 
 ```powershell
-.\scripts\install_gemma_windows.ps1
-.\scripts\start_gemma_windows.ps1
+ollama pull gemma4:e2b
+ollama serve
 ```
 
-The pinned llama.cpp runtime and `gemma-3-1b-it-Q4_K_M.gguf` remain under the ignored `data/`
-directory. The development profile uses the local server when healthy and falls back to safe,
-deterministic behavior when it is unavailable.
+Ollama keeps its own model store outside the repository. The development profile uses the local
+daemon when it answers and falls back to safe, deterministic behavior when it does not.
 
 ### Desktop camera and voice simulation
 
@@ -322,14 +323,14 @@ sudo ./scripts/install_app_pi.sh
 cd /opt/manny
 sudo install -o manny -g manny -m 0600 configs/raspberrypi.env.example .env
 sudoedit .env
-sudo ./scripts/install_gemma_pi.sh
+sudo ./scripts/install_ollama_pi.sh
 sudo ./scripts/install_multilingual_voice_pi.sh
 sudo ./scripts/install_systemd.sh
 sudo ./scripts/verify_hardware.sh
 ```
 
 The app installer copies the reviewed source without credentials, local data, Git metadata, or
-build caches. The Gemma installer requires explicit license confirmation, pins its llama.cpp
+build caches. The Ollama installer requires explicit license confirmation, checksum-verifies its
 source revision, and verifies the model checksum. Installation does not automatically authorize
 MCP or enable services. After configuration and hardware verification, review and enable the
 `manny-llm`, `manny-core`, and `manny-kiosk` systemd units as appropriate.

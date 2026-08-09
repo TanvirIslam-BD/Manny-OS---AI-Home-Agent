@@ -4,7 +4,7 @@
 
 - [x] Phase 0 — scaffold, configuration, state, mocks, API, simulator, CI
 - [x] Phase 1 — all UI states, pairing, confirmation, settings, accessibility, component tests
-- [x] Phase 2 — mock MCP, policy broker, Gemma/llama.cpp agent adapter, typed finance flows
+- [x] Phase 2 — mock MCP, policy broker, Ollama-served agent adapter, typed finance flows
 - [x] Phase 3 — wake/VAD/STT/TTS, multilingual Whisper/eSpeak and Moonshine/Kokoro adapters, half-duplex desktop voice
 - [x] Phase 4 — OAuth remote MCP, schema normalization, keyring storage, offline cache
 - [x] Phase 5 — Picamera2 lifecycle, local presence, desktop camera, multi-person privacy
@@ -15,7 +15,7 @@
 ## External validation gates
 
 - [ ] Select the final display, camera, microphone, speaker/amplifier, LED controller, controls, and GPIO mapping.
-- [ ] Benchmark multilingual Whisper base, eSpeak NG, Gemma 3 1B IT Q4_K_M, and the person detector together on Raspberry Pi 5 8 GB, including English, Bangla, Hindi, Mandarin Chinese, and Japanese acceptance samples.
+- [ ] Benchmark multilingual Whisper base, eSpeak NG, `gemma4:e2b`, and the person detector together on Raspberry Pi 5 8 GB, including English, Bangla, Hindi, Mandarin Chinese, and Japanese acceptance samples.
 - [ ] Run `scripts/verify_hardware.sh` and physical camera/audio/display/privacy tests.
 - [ ] Validate touch, motion, acoustics, wake-word errors, thermal behavior, and power recovery on-device.
 - [ ] Provision the production OS keyring, OAuth policy, Minisign signing key, and public verification key.

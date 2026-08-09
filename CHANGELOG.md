@@ -26,6 +26,13 @@ All notable changes to Manny OS are documented here.
 - Multilingual text and voice pipeline with BCP-47 metadata, same-language safe finance templates, whisper.cpp automatic STT detection, eSpeak NG output, browser language controls, and Pi installation
 - Selectable Gemma quantisation via `MANNY_GEMMA_QUANT`, with `q4_0` available for faster Cortex-A76 prompt processing once you supply a checksum you verified
 
+### Changed
+
+- The local model is served by Ollama instead of llama.cpp, and the conversational model is `gemma4:e2b` — one multimodal model for text and image, replacing both the 1B router and the separate 4B vision model on its own server (ADR-020)
+- `install_gemma_pi.sh`, the two Windows llama.cpp scripts and `manny-llm.service` are gone; `install_ollama_pi.sh` installs a checksum-verified runtime and applies Manny's hardening as a drop-in over Ollama's own unit
+- Model weights are no longer checksum-pinned, because Ollama's registry offers no equivalent; the runtime binary still is, since a service binary is code rather than data
+- No systemd memory ceiling is set for the model: an E2B-class model's resident size depends on whether the runtime offloads per-layer embeddings, and a guessed ceiling either does nothing or OOM-kills it long after deployment
+
 ### Fixed
 
 - Pi and production profiles asked for `gemma-3-4b-it` while the installer downloaded the 1B model, so `manny-llm` exited on a missing file after a default install

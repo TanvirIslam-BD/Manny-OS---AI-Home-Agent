@@ -90,7 +90,7 @@ Decision: Keep Moonshine, Kokoro, Picamera2, and ALSA behind protocols and load 
 
 ## ADR-015 — Local conversational model
 
-Status: Accepted
+Status: Superseded by ADR-020 (runtime and model); its constraints on the model's role still hold
 
 Decision: Use Gemma 3 1B Instruction-Tuned Q4_K_M as the initial Raspberry Pi 5 8 GB conversational model through a loopback-only llama.cpp server. Constrain and validate its routing output, keep only short volatile non-financial context, never expose credentials, and preserve deterministic policy and fallback behavior. Treat a move to a larger model as a benchmark-driven hardware decision.
 
@@ -102,7 +102,7 @@ Decision: Carry normalized BCP-47 language metadata through STT, agent, API, bro
 
 ## ADR-017 — Multimodal conversational model on the device
 
-Status: Superseded by ADR-019 for conversation; still current for scene description
+Status: Superseded by ADR-020. Scene description moved to the same multimodal model as conversation, so the separate vision model and its second server are both gone
 
 Decision: Raspberry Pi and production profiles use Gemma 3 4B IT Q4_K_M as a
 single multimodal model serving both conversation and camera scene description,
@@ -155,7 +155,7 @@ the configured remote server, which is a data boundary, not an inference one.
 
 ## ADR-019 — Gemma 3 1B for conversation on the device
 
-Status: Accepted
+Status: Superseded by ADR-020
 
 Decision: Raspberry Pi and production profiles use Gemma 3 1B IT for conversation,
 restoring the ADR-015 default on those profiles and superseding ADR-017's choice of
@@ -173,3 +173,49 @@ measured against a labelled set of real utterances. Qwen3 1.7B is the fallback i
 routing proves too weak, with Bengali and Hindi template quality to re-verify before
 adopting it. Enabling scene description means installing 4B with its projector on a
 second llama-server, not switching the conversational model back.
+
+## ADR-020 — Ollama as the local runtime, with a multimodal E2B model
+
+Status: Accepted
+
+Decision: Ollama replaces llama.cpp as the only local inference runtime, and the
+conversational model becomes `gemma4:e2b` — an E2B-class model of roughly 2B active
+parameters drawn from a larger stored model, natively capable of text and image.
+Supersedes ADR-015's choice of runtime and ADR-019's choice of model. Speech
+recognition stays on whisper.cpp.
+
+Rationale: the adapter was always an OpenAI-compatible chat client, so the runtime
+was never load-bearing in the code — the switch is a base URL and a port. What it
+buys is a model that handles image input, which retires the separate 4B vision model
+ADR-017 introduced and the second server it needed. It also makes changing models a
+configuration change instead of a source build, which matters while the right model
+for this device is still unknown.
+
+Consequences, stated because several are losses:
+
+Model weights are no longer checksum-verified. `install_gemma_pi.sh` refused to
+download anything without a SHA the operator had checked; Ollama's registry offers no
+equivalent, so that guarantee is gone. The Ollama binary is still verified, because
+it runs as a service and that is arbitrary code execution rather than data.
+
+Vision and conversation now share an endpoint and a model. The separate port and
+separate weights were llama.cpp constraints — one server, one model — not
+requirements.
+
+Predictability is traded for flexibility. A model manager can unload between turns
+where a pinned llama-server never did, so `OLLAMA_KEEP_ALIVE=-1` is set to stop a
+multi-second reload landing mid-conversation.
+
+Two things are unverified and deliberately not written down as if they were known.
+Whether the tag resolves, and what it occupies resident — an E2B model only fits
+8 GB if the runtime offloads its per-layer embeddings, so no memory ceiling is set
+anywhere until `ollama ps` has been read on the device. If it does not fit, the
+options are a 16 GB board, dropping the Chromium kiosk, or a smaller tag; the last of
+those is now one environment variable.
+
+Storage moved into the inference path. A partially offloaded model faults to disk
+during generation, so NVMe is required rather than optional — which reverses the
+earlier reasoning that storage speed could not affect a bandwidth-bound decode.
+
+Reverting means restoring `install_gemma_pi.sh`, `manny-llm.service` and the
+`model.env` mechanism from history, and pointing `llm_base_url` back at port 8080.
