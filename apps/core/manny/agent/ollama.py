@@ -205,10 +205,15 @@ class OllamaAgentModel:
         repair: bool,
         on_reply_chunk: ReplyChunkListener | None = None,
     ) -> AgentDecision:
-        # The instruction leads and never varies, so llama.cpp keeps its ~610 tokens
-        # in the prompt cache across turns. Folding it into the trailing user message
-        # instead put it behind the growing history, which changed the prefix every
-        # turn and forced a full re-evaluation of the whole instruction each time.
+        # The instruction leads and never varies, so the runtime keeps it in the
+        # prompt cache across turns. Folding it into the trailing user message instead
+        # put it behind the growing history, which changed the prefix every turn and
+        # forced a full re-evaluation each time.
+        #
+        # It measures around 940 tokens, not the 610 this comment used to claim — the
+        # multilingual routing examples tokenise far worse than their character count
+        # suggests. That figure sets OLLAMA_CONTEXT_LENGTH in the installer, so it is
+        # worth re-measuring if the instruction grows.
         messages: list[dict[str, str]] = [{"role": "system", "content": SYSTEM_INSTRUCTION}]
         messages.extend(message.model_dump() for message in history)
         request_text = text

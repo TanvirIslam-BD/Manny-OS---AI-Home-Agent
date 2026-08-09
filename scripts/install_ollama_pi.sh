@@ -81,7 +81,19 @@ cat >"${drop_in_dir}/manny.conf" <<'EOF'
 [Service]
 Environment=OLLAMA_HOST=127.0.0.1:11434
 Environment=OLLAMA_MAX_LOADED_MODELS=1
+# Every parallel slot gets its own KV cache, so more than one multiplies the memory
+# a half-duplex device can never use: only one turn runs at a time.
 Environment=OLLAMA_NUM_PARALLEL=1
+# Bound the KV cache rather than accepting a default sized for a larger machine.
+# Manny's prompt measures about 1,950 tokens at full stretch: a ~940-token system
+# instruction, four turns of history, four recalled notes, the question, and a
+# 320-token reply. 3,072 leaves real headroom; 2,048 does not, and an overflow is not
+# a soft failure — truncation would drop the instruction carrying the finance rules.
+Environment=OLLAMA_CONTEXT_LENGTH=3072
+# Flash attention is what allows the KV cache to be quantised; q8_0 roughly halves
+# it for no quality change worth measuring at this size.
+Environment=OLLAMA_FLASH_ATTENTION=1
+Environment=OLLAMA_KV_CACHE_TYPE=q8_0
 # Keep the model resident between turns. Reloading several gigabytes mid-conversation
 # is a multi-second stall on this hardware, which is the failure that made a pinned
 # llama-server predictable and a model manager not.
@@ -155,8 +167,20 @@ Two numbers decide whether this fits an 8 GB board. Run a prompt through it, the
   ollama ps                 # resident size while loaded
   ollama show ${model}      # parameters, quantisation, and whether vision is offered
 
-Under roughly 3 GB resident is comfortable here. Nearer 5 GB and the board needs
-16 GB, or the Chromium kiosk has to go. ${resident:+Currently loaded: ${resident}}
+Under roughly 3 GB resident is comfortable here. ${resident:+Currently loaded: ${resident}}
+
+If it reads nearer 5 GB, three levers remain, in the order worth trying:
+
+  1. zram, for compressed swap in RAM instead of on the card:
+       sudo apt-get install -y zram-tools
+       echo 'ALGO=zstd
+PERCENT=50' | sudo tee /etc/default/zramswap
+       sudo systemctl restart zramswap
+     This gives Chromium's idle pages somewhere cheap to go. Do not let model
+     weights swap to the SD card — that turns generation into minutes.
+  2. Drop the Chromium kiosk and drive the UI from another machine's browser.
+     Worth about 1.5 GB: systemctl disable --now manny-kiosk
+  3. A 16 GB board, or a smaller tag in MANNY_OLLAMA_MODEL.
 
 Then run install_systemd.sh and enable manny-core and manny-kiosk explicitly.
 EOF

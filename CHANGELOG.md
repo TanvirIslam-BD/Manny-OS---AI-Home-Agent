@@ -31,6 +31,8 @@ All notable changes to Manny OS are documented here.
 - The local model is served by Ollama instead of llama.cpp, and the conversational model is `gemma4:e2b` — one multimodal model for text and image, replacing both the 1B router and the separate 4B vision model on its own server (ADR-020)
 - `install_gemma_pi.sh`, the two Windows llama.cpp scripts and `manny-llm.service` are gone; `install_ollama_pi.sh` installs a checksum-verified runtime and applies Manny's hardening as a drop-in over Ollama's own unit
 - Model weights are no longer checksum-pinned, because Ollama's registry offers no equivalent; the runtime binary still is, since a service binary is code rather than data
+- The Ollama drop-in bounds the KV cache deliberately: one parallel slot, a 3,072-token context sized to Manny's measured prompt, and a q8_0 KV cache behind flash attention. Device profiles also carry four turns of history rather than six, since retrieval covers what falls out of the window
+- `docs/hardware.md` documents the 8 GB memory budget, what the configuration already does about it, and the ordered levers left — zram, dropping the kiosk, then more memory or a smaller tag
 - No systemd memory ceiling is set for the model: an E2B-class model's resident size depends on whether the runtime offloads per-layer embeddings, and a guessed ceiling either does nothing or OOM-kills it long after deployment
 
 ### Fixed

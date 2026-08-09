@@ -18,6 +18,71 @@ The runtime binary is checksum-verified: `MANNY_OLLAMA_URL` and `MANNY_OLLAMA_SH
 
 Before relying on a tag, confirm what it is: `ollama show <tag>` reports its parameters, quantisation and whether it advertises vision. A model whose weights include a vision encoder is not the same as a runtime that exposes one, and image support has historically lagged the text path.
 
+## Fitting the conversational model in 8 GB
+
+An E2B-class model stores far more than it activates: roughly 2B active parameters
+out of a larger set held as per-layer embeddings. Whether it fits depends on the
+runtime keeping only the active part resident and faulting the rest from storage. That
+is a property of the runtime, not the model, so it has to be measured:
+
+```bash
+ollama ps          # resident size while the model is loaded
+ollama show <tag>  # parameters, quantisation, and whether vision is advertised
+```
+
+Read that number before trusting any budget below. Nothing in this repository sets a
+memory ceiling, because a guessed one either does nothing or kills the model weeks
+after deployment.
+
+The rest of the board, approximately:
+
+| Consumer | Resident |
+| --- | --- |
+| Raspberry Pi OS Desktop session | ~0.4 GB |
+| Chromium kiosk with the UI loaded | ~0.8–1.1 GB |
+| Manny core (FastAPI, SQLite) | ~0.2 GB |
+| whisper.cpp, only while transcribing | ~0.4 GB |
+
+So roughly 1.5 GB is committed before the model loads, against about 7.8 GB usable
+after GPU/CMA reservation. Comfortable if the model is near 2–3 GB; not if it is 5–6.
+
+What the configuration already does to help:
+
+- `OLLAMA_NUM_PARALLEL=1` — each parallel slot carries its own KV cache, and a
+  half-duplex device runs one turn at a time, so more than one slot buys nothing.
+- `OLLAMA_CONTEXT_LENGTH=3072` — Manny's prompt reaches about 1,950 tokens: a
+  ~940-token system instruction (the multilingual routing examples tokenise far worse
+  than their character count suggests), four turns of history, four recalled notes,
+  the question, and a 320-token reply. A larger context only enlarges the KV cache;
+  a smaller one risks truncating the instruction that carries the finance rules.
+- `OLLAMA_FLASH_ATTENTION=1` with `OLLAMA_KV_CACHE_TYPE=q8_0` — roughly halves the
+  KV cache.
+- `llm_context_turns: 4` on device profiles — fewer prompt tokens, and retrieval
+  covers what falls out of the window rather than the window being the whole memory.
+- `OLLAMA_MAX_LOADED_MODELS=1` — vision and conversation share one model, so nothing
+  should ever want a second.
+
+If `ollama ps` still reports too much, in order of preference:
+
+1. **zram.** Compressed swap in RAM gives Chromium's idle pages somewhere cheap to
+   go. Never let model weights reach SD-card swap; random reads there are 10–40 MB/s
+   and generation stops being conversational.
+   ```bash
+   sudo apt-get install -y zram-tools
+   sudo systemctl restart zramswap
+   ```
+2. **Drop the kiosk.** `systemctl disable --now manny-kiosk` frees roughly 1.5 GB and
+   the UI still works from another machine's browser on the same network.
+3. **More memory, or less model.** A 16 GB board keeps the same bandwidth — it fits,
+   it does not speed up — or set `MANNY_OLLAMA_MODEL` to a smaller tag, which is now
+   one variable and a pull.
+
+Storage is part of this. A partially offloaded model faults to disk during
+generation, so NVMe belongs in the inference path: roughly 400+ MB/s random read
+against 10–40 MB/s on a microSD card. This reverses the earlier reasoning that
+storage could not matter to a memory-bandwidth-bound decode — it could not, for a
+model held entirely in RAM.
+
 Physical selection remains for display/touch, camera FOV, microphone, acoustics, speaker/amplifier, LED controller, controls, GPIO, privacy wiring, power, thermal behavior, and enclosure.
 
 ## Bring-up verification
