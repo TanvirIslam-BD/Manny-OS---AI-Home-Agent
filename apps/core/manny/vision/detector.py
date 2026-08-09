@@ -41,7 +41,14 @@ class OpenCvHogPersonDetector:
         return True
 
     def count_people(self, frame: Any) -> int:
-        cv2 = importlib.import_module("cv2")
+        try:
+            cv2 = importlib.import_module("cv2")
+        except ImportError as exc:
+            # Every other optional runtime reports its own absence this way. OpenCV
+            # is not declared in pyproject, so a Pi that selected this detector
+            # without installing it would otherwise raise a bare ModuleNotFoundError
+            # from inside the camera loop.
+            raise RuntimeError("install OpenCV to use the HOG person detector") from exc
         if self._descriptor is None:
             descriptor = cv2.HOGDescriptor()
             descriptor.setSVMDetector(cv2.HOGDescriptor_getDefaultPeopleDetector())

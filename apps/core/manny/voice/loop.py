@@ -4,9 +4,20 @@ The simulator drives turns over HTTP; on hardware nothing did. This service is
 that missing driver: it records short chunks, gates them through voice activity
 detection, and hands anything that contains speech to the coordinator.
 
-It is opt-in (`MANNY_VOICE_LOOP_ENABLED`) and stays half-duplex — capture never
-overlaps playback, because the coordinator holds its turn lock until the reply
-has finished playing.
+It is opt-in (`MANNY_VOICE_LOOP_ENABLED`) and stays half-duplex: it refuses to
+record while a turn is running, and the coordinator holds its turn lock until the
+reply has finished playing.
+
+Two gates run before the expensive work, because the device has four cores and
+speech recognition wants all of them:
+
+- A turn in progress stops the loop recording at all. It used to record and
+  transcribe straight through the reply, then throw the transcript away on
+  VoiceBusyError, so recognition competed with the model that was generating that
+  very reply.
+- Energy-based voice activity rejects a silent chunk before recognition starts.
+  A whisper.cpp subprocess per three seconds of silence is most of what an idle
+  device would otherwise do.
 """
 
 from __future__ import annotations
@@ -17,7 +28,7 @@ from datetime import UTC, datetime, timedelta
 
 from manny.state import StateMachine
 from manny.voice.coordinator import HalfDuplexVoiceCoordinator, VoiceBusyError
-from manny.voice.interfaces import AudioCapture
+from manny.voice.interfaces import AudioCapture, VoiceActivityDetector
 from manny.voice.models import VoiceTurnResult
 from manny.voice.wake import PhraseWakeWord
 
@@ -36,10 +47,12 @@ class VoiceLoop:
         language: str = "auto",
         wake_word: PhraseWakeWord | None = None,
         follow_up_seconds: float = 8.0,
+        vad: VoiceActivityDetector | None = None,
     ) -> None:
         self._microphone = microphone
         self._coordinator = coordinator
         self._state = state
+        self._vad = vad
         self._chunk_seconds = chunk_seconds
         self._idle_seconds = idle_seconds
         self._language = language
@@ -65,8 +78,17 @@ class VoiceLoop:
         snapshot = self._state.snapshot
         if snapshot.microphone_muted or await self._microphone.is_muted():
             return None
+        if self._coordinator.busy:
+            # Recording through the reply would transcribe Manny's own speech and
+            # steal cores from the model producing it, and run_turn would reject
+            # the result anyway.
+            return None
         audio = await self._microphone.capture(self._chunk_seconds)
         if not audio.pcm:
+            return None
+        if self._vad is not None and not await self._vad.contains_speech(audio):
+            # Cheap energy check first. Recognition is a subprocess that wants
+            # every core; do not spend it on a silent room.
             return None
         if audio.language_hint is None:
             # Recorders emit raw PCM with no language; carry the configured

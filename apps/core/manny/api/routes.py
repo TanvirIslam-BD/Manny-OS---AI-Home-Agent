@@ -17,7 +17,7 @@ from manny.memory import MemoryStats
 from manny.reminders import Reminder, ReminderCreate
 from manny.security import LockedOutError, PasscodeError, SecurityStatus
 from manny.state import PrivacyState, RuntimeSnapshot, RuntimeState
-from manny.voice import AudioBuffer, VoiceBusyError
+from manny.voice import VoiceBusyError
 
 router = APIRouter()
 
@@ -188,10 +188,14 @@ async def simulate_voice(
     if services.state.snapshot.microphone_muted:
         raise HTTPException(status_code=409, detail="microphone is muted")
     try:
-        result = await services.voice.run_turn(
-            AudioBuffer(pcm=body.text.encode(), language_hint=body.language),
+        # Text in, spoken reply out. Wrapping it in an AudioBuffer and running the
+        # recognition stages over it only worked against the mock recogniser; the
+        # device's energy voice activity rejected the same payload as silence.
+        result = await services.voice.run_text_turn(
+            body.text,
             privacy=services.state.snapshot.privacy,
             authenticated=services.security.is_unlocked(),
+            language=body.language,
         )
     except VoiceBusyError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from None

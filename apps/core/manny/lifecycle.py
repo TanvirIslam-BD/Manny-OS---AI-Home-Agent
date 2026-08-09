@@ -352,6 +352,9 @@ def build_services(settings: Settings) -> RuntimeServices:
                     else None
                 ),
                 follow_up_seconds=settings.wake_follow_up_seconds,
+                # Same detector the coordinator uses, so a silent chunk is rejected
+                # before recognition rather than after it.
+                vad=vad,
             )
             if settings.voice_loop_active
             else None

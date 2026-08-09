@@ -177,8 +177,15 @@ Example MCP configuration:
 ```env
 MANNY_MCP_MODE=remote_http
 MANNY_MCP_URL=https://expense-tracker-mcp.mcpize.run/mcp
-MANNY_MCP_ALLOWED_TOOLS=money.get_budget_summary,money.get_transactions
+MANNY_MCP_ALLOWED_TOOLS=get_budget_status,summarize_expenses
 ```
+
+The allowlist must name the tools the *remote* server publishes, which is what
+`RuleBasedAgent._tool_for` requests in `remote_http` mode. The semantic
+`money.*` names belong to the bundled mock server (`mcp_servers/manny_local`) and
+apply only in `mock` mode. Allowlisting a name the agent never requests, or one the
+server does not publish, makes every finance answer come back as "that tool is not
+approved on this device" — the policy is deny-by-default and does not fall back.
 
 The MCP server performs OAuth discovery and uses PKCE with a localhost callback. Development
 tokens are stored under ignored local data with restrictive permissions. Production hardware
