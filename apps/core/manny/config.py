@@ -79,6 +79,12 @@ class Settings(BaseSettings):
     llm_timeout_seconds: float = Field(default=60, gt=0, le=180)
     llm_max_tokens: int = Field(default=320, ge=32, le=512)
     llm_context_turns: int = Field(default=6, ge=1, le=12)
+    # Speak each sentence as it is generated instead of waiting for the whole reply.
+    # The wait is the largest remaining source of perceived latency: on four
+    # Cortex-A76 cores a fifty-token answer is seconds of silence whose first
+    # sentence was speakable almost at once. Only affects spoken turns; /agent/query
+    # still returns one complete response.
+    llm_stream_replies: bool = True
 
     display_width: int | None = Field(default=480, ge=1)
     display_height: int | None = Field(default=480, ge=1)

@@ -332,6 +332,7 @@ def build_services(settings: Settings) -> RuntimeServices:
         state=state,
         speaker=hardware.audio_output,
         voice=settings.tts_voice,
+        stream_replies=settings.llm_stream_replies,
     )
     services = RuntimeServices(
         settings=settings,

@@ -13,6 +13,7 @@ from manny.agent.models import (
     ConversationMessage,
     is_non_personal_education,
 )
+from manny.agent.streaming import ReplyChunkListener, ReplyFieldStream, SentenceChunker
 
 SYSTEM_INSTRUCTION = """You are Manny, a warm home and desk companion.
 Be conversational, calm, concise, and useful. You may chat, explain, brainstorm, and ask
@@ -111,15 +112,23 @@ class LlamaCppAgentModel:
         text: str,
         history: list[ConversationMessage],
         language_hint: str | None = None,
+        on_reply_chunk: ReplyChunkListener | None = None,
     ) -> AgentDecision:
         if is_non_personal_education(text):
             return await self._decide_general_explanation(text, history, language_hint)
         try:
             decision = await self._complete(
-                text, history, language_hint=language_hint, repair=False
+                text,
+                history,
+                language_hint=language_hint,
+                repair=False,
+                on_reply_chunk=on_reply_chunk,
             )
         except (json.JSONDecodeError, ValidationError, ValueError, TypeError):
             try:
+                # No streaming on the repair attempt. The first attempt may already
+                # have spoken part of a reply that failed validation, and speaking a
+                # second version over it would be worse than a short silence.
                 decision = await self._complete(
                     text, history, language_hint=language_hint, repair=True
                 )
@@ -188,6 +197,7 @@ class LlamaCppAgentModel:
         *,
         language_hint: str | None,
         repair: bool,
+        on_reply_chunk: ReplyChunkListener | None = None,
     ) -> AgentDecision:
         # The instruction leads and never varies, so llama.cpp keeps its ~610 tokens
         # in the prompt cache across turns. Folding it into the trailing user message
@@ -231,6 +241,9 @@ class LlamaCppAgentModel:
                 },
             },
         }
+        if on_reply_chunk is not None:
+            content = await self._stream(payload, on_reply_chunk)
+            return AgentDecision.model_validate(json.loads(content))
         try:
             async with httpx.AsyncClient(
                 timeout=self._timeout, transport=self._transport
@@ -242,6 +255,57 @@ class LlamaCppAgentModel:
             raise RuntimeError("Local Gemma is unavailable") from exc
         content = _assistant_content(response.json())
         return AgentDecision.model_validate(json.loads(content))
+
+    async def _stream(
+        self, payload: dict[str, Any], on_reply_chunk: ReplyChunkListener
+    ) -> str:
+        """Generate the decision, handing out the reply a sentence at a time.
+
+        The device otherwise says nothing until the entire object has been decoded,
+        which on four Cortex-A76 cores is seconds of silence spent producing text
+        whose first sentence was speakable almost immediately. The schema puts
+        `intent` before `reply`, so by the time any reply text appears the routing is
+        already settled and speaking it commits to nothing.
+
+        The full document is still assembled and validated exactly as the
+        non-streaming path validates it. Speaking early is an addition, not a
+        replacement for checking what the model actually returned.
+        """
+        streamed = {**payload, "stream": True}
+        field = ReplyFieldStream()
+        chunker = SentenceChunker()
+        assembled: list[str] = []
+        try:
+            async with httpx.AsyncClient(
+                timeout=self._timeout, transport=self._transport
+            ) as client:
+                async with client.stream("POST", self._url, json=streamed) as response:
+                    response.raise_for_status()
+                    async for line in response.aiter_lines():
+                        delta = _stream_delta(line)
+                        if not delta:
+                            continue
+                        assembled.append(delta)
+                        if field.complete:
+                            continue
+                        for piece in chunker.feed(field.feed(delta)):
+                            await on_reply_chunk(piece)
+                        if field.complete:
+                            # Say the last sentence now rather than waiting for the
+                            # remaining fields of a document nobody hears.
+                            trailing = chunker.flush()
+                            if trailing:
+                                await on_reply_chunk(trailing)
+        except httpx.HTTPError as exc:
+            self._status = "unavailable"
+            raise RuntimeError("Local Gemma is unavailable") from exc
+        if not field.complete:
+            # Truncated mid-reply: say what did arrive, then let validation fail and
+            # the repair attempt run.
+            trailing = chunker.flush()
+            if trailing:
+                await on_reply_chunk(trailing)
+        return "".join(assembled)
 
 
 def _alternating(messages: list[dict[str, str]]) -> list[dict[str, str]]:
@@ -260,6 +324,29 @@ def _alternating(messages: list[dict[str, str]]) -> list[dict[str, str]]:
             continue
         merged.append(dict(message))
     return merged
+
+
+def _stream_delta(line: str) -> str:
+    """Pull the content delta out of one server-sent-events line."""
+    if not line.startswith("data:"):
+        return ""
+    body = line[len("data:") :].strip()
+    if not body or body == "[DONE]":
+        return ""
+    try:
+        payload = json.loads(body)
+    except json.JSONDecodeError:
+        return ""
+    if not isinstance(payload, dict):
+        return ""
+    choices = payload.get("choices")
+    if not isinstance(choices, list) or not choices or not isinstance(choices[0], dict):
+        return ""
+    delta = choices[0].get("delta")
+    if not isinstance(delta, dict):
+        return ""
+    content = delta.get("content")
+    return content if isinstance(content, str) else ""
 
 
 def _assistant_content(payload: Any) -> str:

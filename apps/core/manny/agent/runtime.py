@@ -22,6 +22,7 @@ from manny.agent.models import (
     RecurringSummary,
     is_non_personal_education,
 )
+from manny.agent.streaming import ReplyChunkListener
 from manny.i18n import detect_text_language, finance_template, normalize_language_tag
 from manny.memory import MemoryStore
 from manny.memory.store import entries_from_turn
@@ -51,6 +52,7 @@ class IntentModel(Protocol):
         text: str,
         history: list[ConversationMessage],
         language_hint: str | None = None,
+        on_reply_chunk: ReplyChunkListener | None = None,
     ) -> AgentDecision: ...
 
 
@@ -175,8 +177,11 @@ class DeterministicIntentModel:
         text: str,
         history: list[ConversationMessage],
         language_hint: str | None = None,
+        on_reply_chunk: ReplyChunkListener | None = None,
     ) -> AgentDecision:
-        del history
+        # Nothing to stream: this returns a complete reply without generating it, so
+        # the caller's full-synthesis path is already the fastest one.
+        del history, on_reply_chunk
         language = detect_text_language(text, language_hint)
         intent = await self.classify(text)
         if intent != "general":
@@ -300,7 +305,13 @@ class RuleBasedAgent:
             await self._memory.clear()
         await self.clear_context()
 
-    async def answer(self, query: AgentQuery, *, privacy: PrivacyState) -> AgentResponse:
+    async def answer(
+        self,
+        query: AgentQuery,
+        *,
+        privacy: PrivacyState,
+        on_reply_chunk: ReplyChunkListener | None = None,
+    ) -> AgentResponse:
         remember = privacy in {PrivacyState.PRIVATE_IDLE, PrivacyState.PRESENT_TRUSTED}
         deterministic_intent = await self._fallback_model.classify(query.text)
         detected_language = detect_text_language(query.text, query.language)
@@ -333,7 +344,7 @@ class RuleBasedAgent:
                 model_text = f"{recalled_text}{query.text}" if recalled_text else query.text
                 try:
                     model_decision = await self._model.decide(
-                        model_text, history, query.language
+                        model_text, history, query.language, on_reply_chunk
                     )
                 except RuntimeError:
                     model_decision = await self._fallback_model.decide(

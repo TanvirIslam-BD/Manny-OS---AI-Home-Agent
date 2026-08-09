@@ -42,9 +42,8 @@ def build(**kwargs: float) -> UtteranceRecorder:
         "pre_roll_seconds": 0.2,
     }
     defaults.update(kwargs)
-    return UtteranceRecorder(
-        EnergyVoiceActivity(threshold=0.02, minimum_seconds=0.0), **defaults  # type: ignore[arg-type]
-    )
+    vad = EnergyVoiceActivity(threshold=0.02, minimum_seconds=0.0)
+    return UtteranceRecorder(vad, **defaults)  # type: ignore[arg-type]
 
 
 def frame_count(audio: AudioBuffer, seconds: float = FRAME) -> int:

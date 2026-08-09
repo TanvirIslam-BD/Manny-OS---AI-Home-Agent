@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 
 from manny.agent import AgentQuery, RuleBasedAgent
 from manny.i18n import detect_text_language
@@ -14,6 +15,8 @@ from manny.voice.interfaces import (
     VoiceActivityDetector,
 )
 from manny.voice.models import AudioBuffer, Transcript, VoiceTurnResult
+
+logger = logging.getLogger(__name__)
 
 
 class VoiceBusyError(RuntimeError):
@@ -31,8 +34,10 @@ class HalfDuplexVoiceCoordinator:
         state: StateMachine,
         speaker: AudioPlayback | None = None,
         voice: str = "",
+        stream_replies: bool = False,
     ) -> None:
         self._voice = voice
+        self._stream_replies = stream_replies
         self._stt = stt
         self._tts = tts
         self._vad = vad
@@ -105,6 +110,34 @@ class HalfDuplexVoiceCoordinator:
         self, transcript: Transcript, *, privacy: PrivacyState, authenticated: bool
     ) -> VoiceTurnResult:
         await self._state.transition(RuntimeState.THINKING, force=True)
+        streamed: list[AudioBuffer] = []
+
+        async def speak_piece(piece: str) -> None:
+            """Speak one sentence while the rest is still being generated.
+
+            The reply's language field arrives after the reply text does, so the
+            transcript's language is used here. That is the language the user spoke
+            and what the model is instructed to answer in, and it is what the device
+            profile pins on the Pi.
+            """
+            try:
+                if not streamed:
+                    await self._state.transition(
+                        RuntimeState.SPEAKING, force=True, message=piece[:160]
+                    )
+                audio = await self._tts.synthesize(
+                    piece, voice=self._voice, language=transcript.language
+                )
+                if self._speaker is not None:
+                    await self._speaker.play(audio)
+                streamed.append(audio)
+            except Exception:
+                # Never let synthesis break the turn. With nothing spoken yet the
+                # full reply is still synthesised below; mid-reply, the caller gets
+                # the text and the remainder is dropped rather than restarted, since
+                # speaking a second copy over the first is worse than stopping.
+                logger.warning("could not speak a streamed reply piece", exc_info=True)
+
         response = await self._agent.answer(
             AgentQuery(
                 text=transcript.text,
@@ -112,7 +145,19 @@ class HalfDuplexVoiceCoordinator:
                 language=transcript.language,
             ),
             privacy=privacy,
+            on_reply_chunk=speak_piece if self._stream_replies else None,
         )
+        if streamed:
+            # Already said aloud while it was being generated.
+            return VoiceTurnResult(
+                transcript=transcript,
+                answer=response.answer,
+                audio=_joined(streamed),
+                tool_name=response.tool_name,
+                language=response.language,
+                intent=response.intent,
+                data=response.data,
+            )
         await self._state.transition(
             RuntimeState.SPEAKING, force=True, message=response.answer[:160]
         )
@@ -132,3 +177,18 @@ class HalfDuplexVoiceCoordinator:
             intent=response.intent,
             data=response.data,
         )
+
+
+def _joined(parts: list[AudioBuffer]) -> AudioBuffer:
+    """One buffer from the pieces already played, for the turn's result.
+
+    Callers expect the audio that was spoken. The pieces come from one synthesiser
+    with one voice, so format is uniform and concatenating the PCM is enough.
+    """
+    first = parts[0]
+    return AudioBuffer(
+        pcm=b"".join(part.pcm for part in parts),
+        sample_rate=first.sample_rate,
+        channels=first.channels,
+        language_hint=first.language_hint,
+    )
