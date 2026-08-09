@@ -19,7 +19,12 @@ from manny.agent.models import (
     ConversationMessage,
     is_non_personal_education,
 )
-from manny.agent.streaming import ReplyChunkListener, ReplyFieldStream, SentenceChunker
+from manny.agent.streaming import (
+    ReplyChunkListener,
+    ReplyFieldStream,
+    SentenceChunker,
+    normalise_model_text,
+)
 
 SYSTEM_INSTRUCTION = """You are Manny, a warm home and desk companion.
 Be conversational, calm, concise, and useful. You may chat, explain, brainstorm, and ask
@@ -192,7 +197,7 @@ class OllamaAgentModel:
         self._status = "ok"
         return AgentDecision(
             intent="general",
-            reply=reply.reply,
+            reply=normalise_model_text(reply.reply),
             language=language_hint or reply.language,
         )
 
@@ -260,7 +265,7 @@ class OllamaAgentModel:
         }
         if on_reply_chunk is not None:
             content = await self._stream(payload, on_reply_chunk)
-            return AgentDecision.model_validate(json.loads(content))
+            return _clean(AgentDecision.model_validate(json.loads(content)))
         try:
             async with httpx.AsyncClient(
                 timeout=self._timeout, transport=self._transport
@@ -271,7 +276,7 @@ class OllamaAgentModel:
             self._status = "unavailable"
             raise RuntimeError("The local model is unavailable") from exc
         content = _assistant_content(response.json())
-        return AgentDecision.model_validate(json.loads(content))
+        return _clean(AgentDecision.model_validate(json.loads(content)))
 
     async def _stream(
         self, payload: dict[str, Any], on_reply_chunk: ReplyChunkListener
@@ -342,6 +347,16 @@ def _alternating(messages: list[dict[str, str]]) -> list[dict[str, str]]:
         merged.append(dict(message))
     return merged
 
+
+
+def _clean(decision: AgentDecision) -> AgentDecision:
+    """Strip word-boundary markers from anything the user will see or hear."""
+    return decision.model_copy(
+        update={
+            "reply": normalise_model_text(decision.reply),
+            "reply_template": normalise_model_text(decision.reply_template),
+        }
+    )
 
 def _stream_delta(line: str) -> str:
     """Pull the content delta out of one server-sent-events line."""

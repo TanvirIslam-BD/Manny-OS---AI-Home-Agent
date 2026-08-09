@@ -19,6 +19,7 @@ decimal point, a field name that is a prefix of another.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Awaitable, Callable
 
 # Called with each speakable piece as it becomes available. Awaited in sequence, so a
@@ -38,6 +39,30 @@ _CLEAR_TERMINATORS = "!?…。！？；।॥۔\n"
 _TERMINATORS = _AMBIGUOUS_TERMINATORS + _CLEAR_TERMINATORS
 _MINIMUM_CLEAR_CHARACTERS = 2
 _ESCAPES = {'"': '"', "\\": "\\", "/": "/", "b": "\b", "f": "\f", "n": "\n", "r": "\r", "t": "\t"}
+
+
+# SentencePiece writes a word boundary as U+2581, and Gemma sometimes emits it literally
+# instead of a space — observed as "help you plan.<mark><mark>Just let me know" from a real
+# model. It has to be removed rather than tolerated for two reasons: eSpeak would try to
+# pronounce it, and a full stop followed by U+2581 is not followed by whitespace, so
+# SentenceChunker would not treat it as a sentence end and a whole reply would arrive as
+# one late piece.
+_WORD_BOUNDARY = "▁"
+
+
+def normalise_model_text(text: str, *, collapse: bool = True) -> str:
+    """Turn a model's word-boundary markers back into spaces.
+
+    `collapse` is off while streaming: pieces arrive mid-sentence, and collapsing runs of
+    spaces at a piece boundary would silently delete a legitimate one. Substitution alone
+    is safe there because it is per-character.
+    """
+    if _WORD_BOUNDARY not in text:
+        return text
+    text = text.replace(_WORD_BOUNDARY, " ")
+    if not collapse:
+        return text
+    return re.sub(r"[ 	]{2,}", " ", text).strip()
 
 
 class ReplyFieldStream:

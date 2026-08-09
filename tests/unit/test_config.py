@@ -5,7 +5,7 @@ from manny.config import Settings
 
 
 def test_public_settings_do_not_include_mcp_url() -> None:
-    settings = Settings(mcp_url="https://private.example/mcp")
+    settings = Settings(mcp_url="https://private.example/mcp", _env_file=None)
 
     public = settings.public_dict()
 
@@ -15,27 +15,27 @@ def test_public_settings_do_not_include_mcp_url() -> None:
 
 def test_non_loopback_api_binding_is_rejected() -> None:
     with pytest.raises(ValidationError, match="loopback"):
-        Settings(api_host="0.0.0.0")
+        Settings(api_host="0.0.0.0", _env_file=None)
 
 
 def test_local_llm_cannot_send_conversation_to_remote_host() -> None:
     with pytest.raises(ValidationError, match="loopback"):
-        Settings(llm_base_url="https://models.example.test")
+        Settings(llm_base_url="https://models.example.test", _env_file=None)
 
 
 def test_face_recognition_cannot_be_silently_enabled() -> None:
     with pytest.raises(ValidationError, match="face recognition"):
-        Settings(face_recognition_enabled=True)
+        Settings(face_recognition_enabled=True, _env_file=None)
 
 
 def test_documented_environment_variable_name_is_supported(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("MANNY_ENV", "test")
 
-    assert Settings().environment == "test"
+    assert Settings(_env_file=None).environment == "test"
 
 
 def test_iana_timezone_is_portable() -> None:
-    assert Settings(user_timezone="America/New_York").user_timezone == "America/New_York"
+    assert Settings(user_timezone="America/New_York", _env_file=None).user_timezone == "America/New_York"
 
 
 def test_remote_mcp_requires_https() -> None:

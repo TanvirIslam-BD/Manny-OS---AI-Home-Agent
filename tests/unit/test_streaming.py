@@ -8,7 +8,7 @@ import httpx
 import pytest
 
 from manny.agent.ollama import OllamaAgentModel
-from manny.agent.streaming import ReplyFieldStream, SentenceChunker
+from manny.agent.streaming import ReplyFieldStream, SentenceChunker, normalise_model_text
 
 BACKSLASH = chr(92)
 NEWLINE = chr(10)
@@ -203,3 +203,35 @@ async def test_without_a_listener_the_request_is_not_streamed() -> None:
 
     assert "stream" not in seen[0] or seen[0]["stream"] is False
     assert decision.reply == "Hello there, friend."
+
+def test_word_boundary_markers_are_turned_back_into_spaces() -> None:
+    # Observed from a real Gemma via Ollama: "help you plan.▁▁Just let me know".
+    # eSpeak would try to pronounce those, and they are not whitespace, so a full stop
+    # followed by one is not a sentence end as far as SentenceChunker is concerned.
+    raw = "I can help you plan.▁▁Just let me know."
+
+    assert normalise_model_text(raw) == "I can help you plan. Just let me know."
+
+
+def test_normalising_is_a_no_op_for_ordinary_text() -> None:
+    for text in ["Hello there.", "আমি ভালো আছি।", "3.5 and e.g. stay put", ""]:
+        assert normalise_model_text(text) == text
+
+
+def test_streaming_does_not_collapse_spaces_across_piece_boundaries() -> None:
+    # Mid-stream a piece can end in a space that the next piece continues from, so
+    # collapsing runs there would silently delete a legitimate one.
+    assert normalise_model_text("word ▁", collapse=False) == "word  "
+    assert normalise_model_text("word ▁") == "word"
+
+
+def test_a_marker_no_longer_hides_a_sentence_boundary() -> None:
+    # Without normalising, the chunker sees "plan." followed by a marker rather than
+    # whitespace, refuses to split, and the whole reply arrives as one late piece.
+    raw = "I can help you plan.▁▁Just let me know."
+
+    assert SentenceChunker().feed(raw) == []
+    assert SentenceChunker().feed(normalise_model_text(raw) + " ") == [
+        "I can help you plan.",
+        "Just let me know.",
+    ]
