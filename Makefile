@@ -1,4 +1,4 @@
-.PHONY: setup dev test lint typecheck ui run mock-mcp build install-pi install-app-pi install-gemma-pi install-voice-pi health
+.PHONY: setup dev test lint typecheck ui run mock-mcp build install-pi install-app-pi install-ollama-pi install-voice-pi health
 
 PYTHON ?= python
 NPM ?= npm
@@ -39,8 +39,8 @@ install-pi:
 install-app-pi:
 	./scripts/install_app_pi.sh
 
-install-gemma-pi:
-	./scripts/install_gemma_pi.sh
+install-ollama-pi:
+	./scripts/install_ollama_pi.sh
 
 install-voice-pi:
 	./scripts/install_multilingual_voice_pi.sh

@@ -8,6 +8,7 @@ fi
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 install -m 0644 "${root}/systemd/manny-core.service" /etc/systemd/system/manny-core.service
 install -m 0644 "${root}/systemd/manny-kiosk.service" /etc/systemd/system/manny-kiosk.service
-install -m 0644 "${root}/systemd/manny-llm.service" /etc/systemd/system/manny-llm.service
 systemctl daemon-reload
-echo 'Units installed but not enabled. Configure /opt/manny/.env, then enable manny-llm, manny-core, and manny-kiosk explicitly.'
+echo 'Units installed but not enabled. Configure /opt/manny/.env, then enable manny-core'
+echo 'and manny-kiosk explicitly. The model runtime is ollama.service, installed and'
+echo 'enabled by install_ollama_pi.sh, which also applies Manny hardening as a drop-in.'

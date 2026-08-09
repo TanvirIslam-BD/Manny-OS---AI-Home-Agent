@@ -36,8 +36,8 @@ trap 'rm -rf "${workspace}"' EXIT
 : "${MANNY_AUDIO_DEVICE:=default}"
 : "${MANNY_LED_STATE_PATH:=}"
 : "${MANNY_DISPLAY_BRIGHTNESS_PATH:=}"
-: "${MANNY_LLM_BASE_URL:=http://127.0.0.1:8080}"
-: "${MANNY_LLM_MODEL:=gemma-3-1b-it}"
+: "${MANNY_LLM_BASE_URL:=http://127.0.0.1:11434}"
+: "${MANNY_LLM_MODEL:=gemma4:e2b}"
 : "${MANNY_CAMERA_ENABLED:=false}"
 capture_seconds=2
 
@@ -88,12 +88,10 @@ check 'audio playback utility' command -v aplay
 check 'audio capture device' bash -c 'arecord -l | grep -q card'
 check 'audio playback device' bash -c 'aplay -l | grep -q card'
 check 'Chromium kiosk' command -v chromium
-check 'llama.cpp server' test -x /opt/manny/llama.cpp/build/bin/llama-server
-check 'Gemma model' bash -c 'ls /opt/manny/models/gemma-3-*-it-Q4_*.gguf >/dev/null 2>&1'
-# The unit launches whatever the installer recorded here, so a model on disk that
-# this file disagrees with is the drift that used to stop llama-server from starting.
-check 'recorded model matches disk' bash -c   '. /opt/manny/model.env && test -r "${MANNY_LLM_MODEL_FILE}"'
-check 'vision projector (4B multimodal only)' bash -c   'ls /opt/manny/models/gemma-3-4b-it-mmproj-*.gguf >/dev/null 2>&1 || ls /opt/manny/models/gemma-3-1b-it-Q4_*.gguf >/dev/null 2>&1'
+check 'Ollama runtime' command -v ollama
+# The core asks for MANNY_LLM_MODEL by name. A tag that was never pulled fails at
+# the first question rather than at startup, so it is worth catching here.
+check "model ${MANNY_LLM_MODEL} pulled" bash -c 'ollama list 2>/dev/null | grep -qF "${MANNY_LLM_MODEL}"'
 check 'whisper.cpp CLI' test -x /opt/manny/whisper.cpp/build/bin/whisper-cli
 check 'multilingual Whisper model' test -r /opt/manny/models/ggml-base.bin
 check 'eSpeak NG' command -v espeak-ng
@@ -242,29 +240,38 @@ else
 fi
 
 section 'Local model'
-if curl -sf --max-time 5 "${MANNY_LLM_BASE_URL}/health" >/dev/null 2>&1; then
-  reply="$(curl -sf --max-time 60 "${MANNY_LLM_BASE_URL}/v1/chat/completions" \
-    -H 'Content-Type: application/json' \
-    -d '{"messages":[{"role":"user","content":"Reply with the word ready."}],"max_tokens":8,"stream":false}' 2>/dev/null)"
-  if [[ -n "${reply}" ]]; then
-    ok 'llama-server answers a completion'
-  else
-    broken 'llama-server answers a completion' 'health passed but generation failed'
-  fi
-  # The core sends MANNY_LLM_MODEL as the model name. If the server answers to a
-  # different alias, the profile and the installed weights have drifted apart —
-  # the same class of mismatch that used to stop manny-llm from starting at all.
+# Ollama has no /health; /api/tags is the cheapest proof the daemon is up.
+if curl -sf --max-time 5 "${MANNY_LLM_BASE_URL}/api/tags" >/dev/null 2>&1; then
   served="$(curl -sf --max-time 5 "${MANNY_LLM_BASE_URL}/v1/models" 2>/dev/null)"
+  needle="$(printf '"%s"' "${MANNY_LLM_MODEL}")"
   if [[ -z "${served}" ]]; then
-    skip 'served model matches MANNY_LLM_MODEL' 'server did not list its models'
-  elif printf '%s' "${served}" | grep -qF "\"${MANNY_LLM_MODEL}\""; then
+    skip 'served model matches MANNY_LLM_MODEL' 'daemon did not list its models'
+  elif printf '%s' "${served}" | grep -qF "${needle}"; then
     ok "served model matches MANNY_LLM_MODEL (${MANNY_LLM_MODEL})"
   else
     broken 'served model matches MANNY_LLM_MODEL' \
-      "core sends ${MANNY_LLM_MODEL}; server lists something else"
+      "core sends ${MANNY_LLM_MODEL}; daemon lists something else"
+  fi
+  # Generation, not just a listing. The first prompt also pays the load cost, so
+  # this is allowed far longer than the other function checks.
+  request="$(printf '{"model":"%s","messages":[{"role":"user","content":"Reply with the word ready."}],"max_tokens":8,"stream":false}' "${MANNY_LLM_MODEL}")"
+  reply="$(curl -sf --max-time 180 "${MANNY_LLM_BASE_URL}/v1/chat/completions" -H 'Content-Type: application/json' -d "${request}" 2>/dev/null)"
+  if [[ -n "${reply}" ]]; then
+    ok 'the local model answers a completion'
+  else
+    broken 'the local model answers a completion' 'daemon is up but generation failed'
+  fi
+  # The number that decides whether this model fits the board. Reported, never
+  # asserted: what fits depends on the display and voice stack running beside it.
+  loaded="$(ollama ps 2>/dev/null | tail -n +2 | head -1 || true)"
+  if [[ -n "${loaded}" ]]; then
+    printf '  note     resident model: %s
+' "${loaded}"
+    printf '           under ~3GB is comfortable on 8GB beside the kiosk and whisper
+'
   fi
 else
-  skip 'llama-server' "not responding on ${MANNY_LLM_BASE_URL}; start manny-llm first"
+  skip 'the local model' "not responding on ${MANNY_LLM_BASE_URL}; start ollama first"
 fi
 
 section 'Configuration'
@@ -286,4 +293,4 @@ if (( missing > 0 || failed > 0 )); then
   printf '  see docs/hardware.md and docs/troubleshooting.md\n' >&2
   exit 1
 fi
-printf '  Hardware verified. Enable manny-llm, manny-core, and manny-kiosk when ready.\n'
+printf '  Hardware verified. Enable manny-core and manny-kiosk when ready.\n'
