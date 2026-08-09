@@ -86,10 +86,11 @@ Environment=OLLAMA_MAX_LOADED_MODELS=1
 # a half-duplex device can never use: only one turn runs at a time.
 Environment=OLLAMA_NUM_PARALLEL=1
 # Bound the KV cache rather than accepting a default sized for a larger machine.
-# Manny's prompt measures about 1,950 tokens at full stretch: a ~940-token system
-# instruction, four turns of history, four recalled notes, the question, and a
-# 320-token reply. 3,072 leaves real headroom; 2,048 does not, and an overflow is not
-# a soft failure — truncation would drop the instruction carrying the finance rules.
+# Manny's prompt reaches about 1,700 tokens at full stretch: a system instruction
+# measured at 758 tokens, four turns of history, four recalled notes, the question,
+# and a 320-token reply. 3,072 leaves real headroom; 2,048 leaves little, and an
+# overflow is not a soft failure - truncation drops the instruction carrying the
+# finance rules.
 Environment=OLLAMA_CONTEXT_LENGTH=3072
 # Flash attention is what allows the KV cache to be quantised; q8_0 roughly halves
 # it for no quality change worth measuring at this size.

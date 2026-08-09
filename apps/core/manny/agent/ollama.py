@@ -210,10 +210,10 @@ class OllamaAgentModel:
         # put it behind the growing history, which changed the prefix every turn and
         # forced a full re-evaluation each time.
         #
-        # It measures around 940 tokens, not the 610 this comment used to claim — the
-        # multilingual routing examples tokenise far worse than their character count
-        # suggests. That figure sets OLLAMA_CONTEXT_LENGTH in the installer, so it is
-        # worth re-measuring if the instruction grows.
+        # Measured at 758 tokens by a real tokeniser, against the 610 this comment once
+        # claimed and the ~940 a character-based estimate suggested. That figure sets
+        # OLLAMA_CONTEXT_LENGTH in the installer, so re-measure if the instruction grows
+        # rather than estimating from its length.
         messages: list[dict[str, str]] = [{"role": "system", "content": SYSTEM_INSTRUCTION}]
         messages.extend(message.model_dump() for message in history)
         request_text = text

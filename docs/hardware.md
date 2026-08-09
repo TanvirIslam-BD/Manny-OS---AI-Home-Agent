@@ -18,6 +18,45 @@ The runtime binary is checksum-verified: `MANNY_OLLAMA_URL` and `MANNY_OLLAMA_SH
 
 Before relying on a tag, confirm what it is: `ollama show <tag>` reports its parameters, quantisation and whether it advertises vision. A model whose weights include a vision encoder is not the same as a runtime that exposes one, and image support has historically lagged the text path.
 
+## LiteRT-LM: measured and rejected
+
+LiteRT-LM was evaluated as a replacement for Ollama and rejected on one measurement.
+Everything else about it was better, so the reason is worth recording.
+
+What worked, tested against `litert-lm serve` 0.15.0 with Gemma 4 E2B and this
+project's real system instruction:
+
+- Schema-constrained output works. The server accepts the exact `response_format`
+  payload the adapter sends and enforces it with llguidance. Replies parsed as valid
+  JSON with exactly the schema's keys and an intent inside the enum.
+- Routing was correct on all five intents tried, and every finance intent left
+  `reply` empty and put only approved placeholders in `reply_template`, with no
+  invented numbers. That is the behaviour the finance boundary depends on.
+- Streaming works and its delta shape is what `_stream_delta` already parses.
+- The model is 2,468 MB on disk against 6.67 GB for the Ollama GGUF, and resident
+  memory during inference measured 2,871 MB on x86-64.
+
+What ruled it out: **`litert-lm serve` does not cache the prompt prefix across
+requests.** Three identical requests took 10.9 s, 10.8 s and 10.7 s, a spread of
+0.2 s. Its handler builds a fresh conversation per HTTP request, so the system
+instruction is re-prefilled every turn. Isolating it, 731 extra prompt tokens cost
+8.2 s, about 89 tok/s prefill.
+
+That defeats the design in `_complete`, which places the invariant instruction first
+precisely so the runtime holds it in the prompt cache. llama.cpp and Ollama do; this
+server does not. On a Pi 5 at Google's 133 tok/s the penalty is roughly 5.7 seconds
+added to every single turn, before any generation.
+
+The library is not the problem, the server is: the Python API holds a `Conversation`
+object whose cache would persist. Using it would mean writing our own local service
+rather than pointing a base URL somewhere else, and holding conversation state
+outside the history handling that already exists. That is a much larger change than
+the swap this evaluation was testing, and it is not currently justified.
+
+One practical note for any future attempt: `litert-lm import --from-huggingface-repo`
+hangs indefinitely at zero bytes without a TTY, so an unattended installer must fetch
+the model with `curl` and then `import` from a local path.
+
 ## Measured Raspberry Pi 5 performance
 
 Google publishes LiteRT-LM benchmarks for Gemma 4 on a Raspberry Pi 5, CPU backend.
@@ -42,7 +81,7 @@ model is 2.58 GB as a LiteRT-LM build and 6.67 GB as an Ollama GGUF. Peak memory
 to the GGUF served by Ollama.
 
 Prefill makes the system instruction a latency cost, not a free constant. It measures
-around 940 tokens, which at 133 tok/s is roughly seven seconds — close to the 7.8 s
+758 tokens, which at 133 tok/s is roughly six seconds — close to the 7.8 s
 time-to-first-token above. That is why `_complete` places the invariant instruction
 first: the runtime keeps it in the prompt cache, and only a cache miss pays for it.
 Shortening it is now a measurable win rather than tidiness.
@@ -115,11 +154,11 @@ What the configuration already does to help:
 
 - `OLLAMA_NUM_PARALLEL=1` — each parallel slot carries its own KV cache, and a
   half-duplex device runs one turn at a time, so more than one slot buys nothing.
-- `OLLAMA_CONTEXT_LENGTH=3072` — Manny's prompt reaches about 1,950 tokens: a
-  ~940-token system instruction (the multilingual routing examples tokenise far worse
-  than their character count suggests), four turns of history, four recalled notes,
-  the question, and a 320-token reply. A larger context only enlarges the KV cache;
-  a smaller one risks truncating the instruction that carries the finance rules.
+- `OLLAMA_CONTEXT_LENGTH=3072` — Manny's prompt reaches about 1,700 tokens: a system
+  instruction measured at 758 tokens by a real tokeniser, four turns of history, four
+  recalled notes, the question, and a 320-token reply. A larger context only enlarges
+  the KV cache; a smaller one risks truncating the instruction that carries the
+  finance rules.
 - `OLLAMA_FLASH_ATTENTION=1` with `OLLAMA_KV_CACHE_TYPE=q8_0` — roughly halves the
   KV cache.
 - `llm_context_turns: 4` on device profiles — fewer prompt tokens, and retrieval
