@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import struct
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from math import pi, sin
 
 import pytest
@@ -265,7 +265,7 @@ class BrokenFrameSource:
         self.fallbacks += 1
         return AudioBuffer(pcm=self.pcm)
 
-    def stream(self, frame_seconds: float) -> AsyncIterator[AudioBuffer]:
+    def stream(self, frame_seconds: float) -> AsyncGenerator[AudioBuffer, None]:
         del frame_seconds
         raise OSError("arecord is unavailable")
 

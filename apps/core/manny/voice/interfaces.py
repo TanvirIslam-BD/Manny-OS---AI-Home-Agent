@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from typing import Protocol, runtime_checkable
 
 from manny.voice.models import AudioBuffer, Transcript
@@ -40,9 +40,13 @@ class AudioFrameSource(Protocol):
 
     Separate from `AudioCapture` because not every recorder can do it — the mocks
     and the desktop simulator do not — so the listen loop treats it as optional.
+
+    A generator rather than a plain iterator because the caller stops reading the
+    moment the utterance ends, which means the stream must be closable: the
+    recorder behind it holds a process and a sound device that have to be released.
     """
 
-    def stream(self, frame_seconds: float) -> AsyncIterator[AudioBuffer]: ...
+    def stream(self, frame_seconds: float) -> AsyncGenerator[AudioBuffer, None]: ...
 
 
 class AudioPlayback(Protocol):

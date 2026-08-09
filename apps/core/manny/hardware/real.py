@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import subprocess
-from collections.abc import AsyncIterator, Sequence
+from collections.abc import AsyncGenerator, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -84,7 +84,7 @@ class AlsaAudioInput:
         )
         return AudioBuffer(pcm=pcm, sample_rate=self.sample_rate, channels=self.channels)
 
-    async def stream(self, frame_seconds: float) -> AsyncIterator[AudioBuffer]:
+    async def stream(self, frame_seconds: float) -> AsyncGenerator[AudioBuffer, None]:
         """Read the microphone continuously in small frames.
 
         One long-lived `arecord` rather than a subprocess per chunk. The old
