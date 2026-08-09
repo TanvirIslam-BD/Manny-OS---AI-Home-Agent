@@ -52,16 +52,67 @@ export function listenOnce(language = 'auto'): Promise<string> {
   })
 }
 
-export function speak(text: string, language = 'en'): void {
+/**
+ * Whether the reply was actually spoken, and why not when it was not.
+ *
+ * Silence used to be indistinguishable from success. Browser speech depends on voices
+ * the operating system provides, and a Bengali or Hindi voice is absent from a default
+ * Windows install — so a reply in those languages produced no sound, no error, and no
+ * explanation. Reporting the reason is the same rule the rest of Manny follows: a
+ * missing dependency says so rather than looking like it worked.
+ */
+export type SpeechOutcome = { spoken: true } | { spoken: false; reason: string }
+
+/**
+ * getVoices() is empty until the browser has loaded them, and fires `voiceschanged`
+ * when it has — except where it never fires at all, hence the timeout.
+ */
+async function loadVoices(): Promise<SpeechSynthesisVoice[]> {
+  const available = window.speechSynthesis.getVoices()
+  if (available.length > 0) return available
+  return new Promise((resolve) => {
+    let settled = false
+    const finish = () => {
+      if (settled) return
+      settled = true
+      resolve(window.speechSynthesis.getVoices())
+    }
+    window.speechSynthesis.addEventListener('voiceschanged', finish, { once: true })
+    window.setTimeout(finish, 1000)
+  })
+}
+
+function voiceFor(voices: SpeechSynthesisVoice[], language: string): SpeechSynthesisVoice | undefined {
+  const wanted = language.toLowerCase()
+  const base = wanted.split('-')[0]
+  return (
+    voices.find((candidate) => candidate.lang.toLowerCase() === wanted)
+    ?? voices.find((candidate) => candidate.lang.toLowerCase().split('-')[0] === base)
+  )
+}
+
+export async function speak(text: string, language = 'en'): Promise<SpeechOutcome> {
+  if (!('speechSynthesis' in window)) {
+    return { spoken: false, reason: 'This browser cannot speak.' }
+  }
+  if (!text.trim()) return { spoken: false, reason: 'There was nothing to say.' }
+
   window.speechSynthesis.cancel()
+  const voices = await loadVoices()
+  const voice = voiceFor(voices, language)
+  if (!voice) {
+    // Deliberately silent rather than reading the text with a voice for another
+    // language: an English voice pronouncing Bengali script produces noise, not speech.
+    return {
+      spoken: false,
+      reason: `No ${language} voice is installed on this system, so the reply is shown but not spoken.`,
+    }
+  }
+
   const utterance = new SpeechSynthesisUtterance(text)
-  const base = language.toLowerCase().split('-')[0]
-  const voice = window.speechSynthesis.getVoices().find((candidate) => (
-    candidate.lang.toLowerCase() === language.toLowerCase()
-    || candidate.lang.toLowerCase().split('-')[0] === base
-  ))
   utterance.lang = language
-  if (voice) utterance.voice = voice
+  utterance.voice = voice
   utterance.rate = 1
   window.speechSynthesis.speak(utterance)
+  return { spoken: true }
 }

@@ -230,16 +230,26 @@ function App() {
     }
   }
 
+  async function announce(text: string, language: string) {
+    // Speech depends on voices the operating system provides, and a Bengali or Hindi
+    // voice is absent from a default Windows install. Say so rather than leaving the
+    // user to wonder whether the speaker is broken.
+    const outcome = await speak(text, language)
+    if (!outcome.spoken) setError(outcome.reason)
+  }
+
   async function submitQuestion(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!question.trim()) return
     setBusy(true)
     setError(null)
     try {
-      setAgentResponse(await askManny(
+      const response = await askManny(
         question.trim(),
         language === 'auto' ? undefined : language,
-      ))
+      )
+      setAgentResponse(response)
+      await announce(response.answer, response.language)
     } catch (reason) {
       setError(messageFrom(reason))
     } finally {
@@ -283,7 +293,7 @@ function App() {
         requires_confirmation: false,
         requires_authentication: false,
       })
-      speak(response.answer, response.language)
+      await announce(response.answer, response.language)
     } catch (reason) {
       setError(messageFrom(reason))
       setSnapshot(await cancelInteraction().catch(() => snapshot))
