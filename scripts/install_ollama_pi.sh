@@ -72,9 +72,6 @@ command -v ollama >/dev/null 2>&1 || {
 if ! id ollama >/dev/null 2>&1; then
   useradd --system --create-home --home-dir /usr/share/ollama --shell /bin/false ollama
 fi
-# The service user needs to reach the model store; nothing else does.
-usermod -a -G ollama manny 2>/dev/null || true
-
 install -d -m 0755 "${drop_in_dir}"
 # Ollama ships its own unit, so Manny constrains it with a drop-in rather than
 # replacing it. OLLAMA_HOST is pinned because the repository invariant is that local

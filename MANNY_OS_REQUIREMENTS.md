@@ -954,7 +954,7 @@ Desired:
 
 - local Gemma-family model appropriate for Raspberry Pi 5
 - LiteRT-LM adapter if validated for the selected model/runtime
-- llama.cpp-compatible adapter as a fallback
+- OpenAI-compatible adapter so the runtime stays replaceable (Ollama today, ADR-020)
 
 Do not tie the entire product to a single model.
 
@@ -2036,7 +2036,7 @@ MANNY_MCP_PROTOCOL_VERSION=2026-07-28
 
 MANNY_STT_BACKEND=moonshine
 MANNY_TTS_BACKEND=kokoro
-MANNY_LLM_BACKEND=llama_cpp
+MANNY_LLM_BACKEND=ollama
 
 MANNY_DISPLAY_WIDTH=480
 MANNY_DISPLAY_HEIGHT=480
