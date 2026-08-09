@@ -1,4 +1,4 @@
-.PHONY: setup dev test lint typecheck ui run mock-mcp build install-pi install-app-pi install-ollama-pi install-voice-pi health
+.PHONY: setup dev test test-routing lint typecheck ui run mock-mcp build install-pi install-app-pi install-ollama-pi install-voice-pi health
 
 PYTHON ?= python
 NPM ?= npm
@@ -12,6 +12,12 @@ dev:
 
 test:
 	$(PYTHON) -m pytest
+
+# Routing and finance-boundary cases against the real conversational model. Needs a
+# served model, so it is not part of `test`. Run it before and after any edit to
+# SYSTEM_INSTRUCTION and compare the score.
+test-routing:
+	MANNY_ROUTING_HARNESS=1 $(PYTHON) -m pytest tests/e2e/test_instruction_routing.py -v
 
 lint:
 	$(PYTHON) -m ruff check apps/core mcp_servers tests

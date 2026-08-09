@@ -11,4 +11,7 @@ llm_base_url: http://127.0.0.1:11434
 llm_model: gemma3n:e2b
 llm_timeout_seconds: 60
 llm_max_tokens: 160
-llm_context_turns: 6
+# Four, matching the device profiles. Development carried six for no recorded reason,
+# which made the simulator slower than the hardware it stands in for and hid the
+# window the device actually ships with. Retrieval covers what falls out of it.
+llm_context_turns: 4

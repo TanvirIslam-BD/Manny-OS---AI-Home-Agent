@@ -239,6 +239,7 @@ Useful commands:
 | `make lint` | Run Python and UI linting |
 | `make typecheck` | Run strict mypy and TypeScript checks |
 | `make test` | Run the Python test suite |
+| `make test-routing` | Check routing and the finance boundary against the real model |
 | `make build` | Build the production UI |
 
 ### Local model on Windows
@@ -364,6 +365,13 @@ make build
 On Windows, use the equivalent `.venv` Python and `npm.cmd` commands if GNU Make is not
 installed. Relevant focused tests should be run while developing; the full gate is still
 required before release.
+
+`SYSTEM_INSTRUCTION` in `apps/core/manny/agent/ollama.py` is load-bearing and the ordinary
+suite cannot check it — `tests/unit/test_intent_routing.py` covers only the deterministic
+keyword router. Run `make test-routing` before and after editing it and compare the score.
+Measured on `gemma3n:e2b`: the shipped instruction scores 10/10, and removing the routing
+examples and placeholder rules drops it to 4/10, with every finance language leaking prose
+into `reply` instead of returning a placeholder template.
 
 A change is done when:
 

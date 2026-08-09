@@ -96,7 +96,10 @@ class Settings(BaseSettings):
     # default language is Bengali, whose script costs more tokens per word than English
     # in this tokenizer, so a cap that reads as generous in English truncates in bn-BD.
     llm_max_tokens: int = Field(default=160, ge=32, le=512)
-    llm_context_turns: int = Field(default=6, ge=1, le=12)
+    # Every profile that ships carries four. The window slides, so the turns after the
+    # cached instruction change on each request and are re-evaluated; more history is
+    # paid for on every question, not once. Retrieval covers what falls out of it.
+    llm_context_turns: int = Field(default=4, ge=1, le=12)
     # Speak each sentence as it is generated instead of waiting for the whole reply.
     # The wait is the largest remaining source of perceived latency: on four
     # Cortex-A76 cores a fifty-token answer is seconds of silence whose first
