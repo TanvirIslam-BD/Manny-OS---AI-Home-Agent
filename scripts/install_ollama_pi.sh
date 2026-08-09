@@ -87,10 +87,15 @@ Environment=OLLAMA_MAX_LOADED_MODELS=1
 Environment=OLLAMA_NUM_PARALLEL=1
 # Bound the KV cache rather than accepting a default sized for a larger machine.
 # Manny's prompt reaches about 1,700 tokens at full stretch: a system instruction
-# measured at 758 tokens, four turns of history, four recalled notes, the question,
-# and a 320-token reply. 3,072 leaves real headroom; 2,048 leaves little, and an
+# measured at 952 tokens, four turns of history, four recalled notes, the question,
+# and a 160-token reply. 3,072 leaves real headroom; 2,048 leaves little, and an
 # overflow is not a soft failure - truncation drops the instruction carrying the
 # finance rules.
+#
+# The instruction grew from 758 to 952 when the brevity rule was added, and the reply
+# ceiling halved from 320 to 160 at the same time, so the total is close to unchanged.
+# Re-measure both against a real tokeniser rather than estimating from length: send
+# the instruction alone and read prompt_eval_count.
 Environment=OLLAMA_CONTEXT_LENGTH=3072
 # Flash attention is what allows the KV cache to be quantised; q8_0 roughly halves
 # it for no quality change worth measuring at this size.

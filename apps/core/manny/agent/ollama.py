@@ -31,6 +31,12 @@ Be conversational, calm, concise, and useful. You may chat, explain, brainstorm,
 clarifying questions. Never claim to have completed an action you did not complete, and
 never deny an ability you actually have.
 
+Keep reply short. One sentence answers a greeting or an acknowledgement; two or three
+answer an ordinary question. Write more only when the user asks for detail or the
+question cannot be answered without it. You are speaking aloud on a small device that
+generates a few words per second, so every unnecessary sentence is a wait the user sits
+through. A brief, warm answer is better than a complete one that arrives late.
+
 You do have memory. Earlier turns of this conversation are given to you, and they are
 stored locally on this device so they survive a restart. You may say that you remember
 things such as a name the user told you. The user can erase it at any time from device
@@ -215,16 +221,22 @@ class OllamaAgentModel:
         # put it behind the growing history, which changed the prefix every turn and
         # forced a full re-evaluation each time.
         #
-        # Measured at 758 tokens by a real tokeniser, against the 610 this comment once
-        # claimed and the ~940 a character-based estimate suggested. That figure sets
-        # OLLAMA_CONTEXT_LENGTH in the installer, so re-measure if the instruction grows
-        # rather than estimating from its length.
+        # Measured at 952 tokens by a real tokeniser, up from 758 when the brevity rule
+        # was added. That figure sets OLLAMA_CONTEXT_LENGTH in the installer, so
+        # re-measure if the instruction grows rather than estimating from its length.
         #
-        # Do not shorten it for speed without re-running the routing cases. Cutting 25% of
-        # it took routing from 9/9 to 7/9 against a real model, and one failure was the
-        # Bengali finance case answering in reply instead of a placeholder template, which
-        # is a finance-boundary violation in this device's default language. The examples
-        # and the placeholder rules are doing work.
+        # Do not shorten it for speed without running `make test-routing`. Cutting the
+        # routing examples and placeholder rules scores 4/10 against a real model where
+        # the shipped instruction scores 10/10, and every finance language fails the same
+        # way: prose in reply instead of a placeholder template, which is a
+        # finance-boundary violation. The examples and the placeholder rules are working.
+        #
+        # Adding to it is not automatically safe either. The brevity rule first shipped
+        # with a worked English example, which scored 7/10 — Bengali and Spanish answered
+        # in English, because a lone English example ahead of the language rule anchors
+        # the reply language. The prose rule alone scores 10/10. Prefer stating a rule to
+        # demonstrating it unless the demonstration covers several languages, as the
+        # routing examples below do.
         messages: list[dict[str, str]] = [{"role": "system", "content": SYSTEM_INSTRUCTION}]
         messages.extend(message.model_dump() for message in history)
         request_text = text
