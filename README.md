@@ -20,6 +20,9 @@ These rules are architectural constraints, not optional conventions:
   Never let an LLM invent balances, budgets, transactions, dates, or amounts.
 - The local LLM never receives MCP credentials, raw authorization tokens, or permission to
   execute tools. It may classify intent and draft general conversation only.
+- All inference runs on the device. There is no cloud model in any path, including as a
+  fallback when the local model fails validation (ADR-018). MCP is a data boundary, not an
+  inference one: tool results come from the configured remote server, prompts never do.
 - All MCP calls pass through the deterministic policy broker and explicit tool allowlist.
 - Manny does not expose payment, transfer, trading, or other irreversible financial actions.
 - Local services bind to loopback by default. Do not expose the API or llama.cpp server to a

@@ -100,9 +100,9 @@ Status: Accepted
 
 Decision: Carry normalized BCP-47 language metadata through STT, agent, API, browser, and TTS boundaries. Use multilingual whisper.cpp base inference for automatic local recognition and eSpeak NG for broad offline speech output. Gemma must reply in the user's language; finance wording may contain only validated placeholders, with real MCP values inserted by deterministic host code after policy and schema checks. Built-in templates cover major languages and English remains the safe final fallback.
 
-## ADR-016 — Multimodal conversational model on the device
+## ADR-017 — Multimodal conversational model on the device
 
-Status: Accepted
+Status: Superseded by ADR-019 for conversation; still current for scene description
 
 Decision: Raspberry Pi and production profiles use Gemma 3 4B IT Q4_K_M as a
 single multimodal model serving both conversation and camera scene description,
@@ -120,10 +120,56 @@ under load remain an open hardware gate.
 
 Amendment: the camera is deferred until a sensor is selected, so device profiles
 ship with camera_enabled false and vision_language_backend none, and the service
-does not load a projector. The multimodal model is retained for its stronger
-instruction-following and multilingual quality; scene description is a
-configuration change away once hardware is chosen.
+does not load a projector. With no image to accept, the reason for 4B on the
+conversational path went with it, and ADR-019 returns that path to 1B for latency.
+4B stays the choice for scene description once a sensor is chosen, on its own
+llama-server instance rather than by switching the conversational model back.
 
 While the camera is off, presence is always absent. MULTIPLE_PEOPLE cannot occur,
 so the automatic masking of financial values when others are nearby does not
 engage and the passcode is the only gate on private views.
+
+## ADR-018 — Fully local inference, with no cloud fallback
+
+Status: Accepted
+
+Decision: All inference stays on the device. Conversation, intent routing, speech
+recognition, and speech synthesis run locally, and there is no cloud model in any
+path — including as a fallback when the local model fails validation.
+
+Rationale: cloud inference would not fix the latency that motivated considering it.
+Financial questions never reach the language model at all — `DeterministicIntentModel`
+classifies them first and the policy broker performs the call — so a remote model
+could only accelerate open conversation, and a network round trip is frequently no
+faster than Gemma 3 1B on this hardware. Against that it would trade the privacy
+posture that is the product's premise, and add a dependency that makes the device
+useless when the connection is down. The remaining latency is structural (fixed
+capture window, nothing streaming) and is addressable locally.
+
+Consequences: conversational quality is capped by what a 1B model can do on four
+Cortex-A76 cores. When the local model returns something that fails schema
+validation twice, the deterministic fallback line is the final answer — there is no
+escape hatch, by choice. Any future quality increase is a local-model or hardware
+decision, not a hosting one. This does not constrain MCP: tool data still comes from
+the configured remote server, which is a data boundary, not an inference one.
+
+## ADR-019 — Gemma 3 1B for conversation on the device
+
+Status: Accepted
+
+Decision: Raspberry Pi and production profiles use Gemma 3 1B IT for conversation,
+restoring the ADR-015 default on those profiles and superseding ADR-017's choice of
+4B for the conversational path. 4B remains the model for camera scene description,
+where the capability gap is real rather than a quality preference.
+
+Rationale: Pi 5 has no usable GPU offload for llama.cpp, so generation is bound by
+memory bandwidth and 4B costs roughly three times as long per token. The device's
+language model classifies intent and drafts wording; it never calls a tool. Latency
+is the binding constraint on a conversational appliance, and quality beyond what 1B
+provides does not buy a better answer for work the broker performs anyway.
+
+Consequences: routing accuracy at 1B is the risk, not speed, and it has not been
+measured against a labelled set of real utterances. Qwen3 1.7B is the fallback if
+routing proves too weak, with Bengali and Hindi template quality to re-verify before
+adopting it. Enabling scene description means installing 4B with its projector on a
+second llama-server, not switching the conversational model back.
