@@ -25,6 +25,7 @@ All notable changes to Manny OS are documented here.
 - Gemma 3 1B IT llama.cpp adapter, short conversational context, schema-validated routing, deterministic fallback, and hardened Pi model service
 - Multilingual text and voice pipeline with BCP-47 metadata, same-language safe finance templates, whisper.cpp automatic STT detection, eSpeak NG output, browser language controls, and Pi installation
 - Selectable Gemma quantisation via `MANNY_GEMMA_QUANT`, with `q4_0` available for faster Cortex-A76 prompt processing once you supply a checksum you verified
+- `POST /api/voice/speak`, which synthesises a reply the browser has no voice for and returns it as WAV, so the desktop simulator speaks the languages its host operating system cannot
 
 ### Changed
 
@@ -35,6 +36,7 @@ All notable changes to Manny OS are documented here.
 - The Ollama drop-in bounds the KV cache deliberately: one parallel slot, a 3,072-token context sized to Manny's measured prompt, and a q8_0 KV cache behind flash attention. Device profiles also carry four turns of history rather than six, since retrieval covers what falls out of the window
 - `docs/hardware.md` documents the 8 GB memory budget, what the configuration already does about it, and the ordered levers left — zram, dropping the kiosk, then more memory or a smaller tag
 - No systemd memory ceiling is set for the model: an E2B-class model's resident size depends on whether the runtime offloads per-layer embeddings, and a guessed ceiling either does nothing or OOM-kills it long after deployment
+- `MANNY_ESPEAK_NG_BINARY` falls back to whatever `espeak-ng` is on PATH when the configured path does not exist, so one profile covers the Pi's `/usr/bin/espeak-ng` and a desktop install anywhere else. An unresolvable name is passed through unchanged rather than substituted, so synthesis still fails loudly instead of speaking with some other program
 
 ### Fixed
 
@@ -42,6 +44,7 @@ All notable changes to Manny OS are documented here.
 - `manny-llm.service` now launches the model the installer recorded in `/opt/manny/model.env` instead of a hardcoded filename that could drift from what is on disk
 - Hardware verification accepts either quantisation, checks the recorded model against the one present on disk, and confirms the running server answers to the alias the core sends
 - Pi and production profiles pointed scene description at port 8080, the text model's server, which cannot read a frame; both now use 8081 as `Settings` already defaulted to
+- Replies in most of the languages Manny supports were displayed and never spoken on the desktop, because browser speech only has the voices the host operating system installed and a default Windows install ships English only. The simulator now falls back to the device's own synthesiser, and only reports that a reply cannot be spoken when that fails too — naming both what the browser lacks and what the device said
 
 ### Security
 

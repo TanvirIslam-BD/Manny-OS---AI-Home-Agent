@@ -23,6 +23,26 @@ export async function simulateVoice(text: string, language?: string): Promise<Vo
   return postJson('/api/interaction/voice/simulate', { text, language })
 }
 
+/**
+ * Ask the device to synthesise a reply this browser has no voice for.
+ *
+ * Returns WAV audio rather than JSON, so it cannot go through postJson. The
+ * error detail is still JSON, and it is the useful part: it says whether the
+ * device has no synthesiser configured or has one that failed.
+ */
+export async function synthesizeSpeech(text: string, language: string): Promise<Blob> {
+  const response = await fetch('/api/voice/speak', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text, language }),
+  })
+  if (!response.ok) {
+    const detail = (await response.json().catch(() => null)) as { detail?: string } | null
+    throw new Error(detail?.detail ?? `Speech request failed: ${response.status}`)
+  }
+  return response.blob()
+}
+
 export async function getState(signal?: AbortSignal): Promise<RuntimeSnapshot> {
   const response = await fetch('/api/state', { signal })
   if (!response.ok) throw new Error(`State request failed: ${response.status}`)

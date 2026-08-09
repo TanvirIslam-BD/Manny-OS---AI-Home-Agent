@@ -103,9 +103,11 @@ export async function speak(text: string, language = 'en'): Promise<SpeechOutcom
   if (!voice) {
     // Deliberately silent rather than reading the text with a voice for another
     // language: an English voice pronouncing Bengali script produces noise, not speech.
+    // The reason states the fact and stops there — the caller can fall back to the
+    // device's own synthesiser, and only it knows whether that worked.
     return {
       spoken: false,
-      reason: `No ${language} voice is installed on this system, so the reply is shown but not spoken.`,
+      reason: `No ${language} voice is installed in this browser.`,
     }
   }
 
@@ -115,4 +117,25 @@ export async function speak(text: string, language = 'en'): Promise<SpeechOutcom
   utterance.rate = 1
   window.speechSynthesis.speak(utterance)
   return { spoken: true }
+}
+
+/**
+ * Play audio the device synthesised, for languages this browser has no voice for.
+ *
+ * Resolves once playback starts rather than once it finishes, matching `speak`,
+ * which queues an utterance and returns. The object URL is released on either
+ * ending or failing so a long session does not accumulate blobs.
+ */
+export async function playAudio(audio: Blob): Promise<void> {
+  const url = URL.createObjectURL(audio)
+  const element = new Audio(url)
+  const release = () => URL.revokeObjectURL(url)
+  element.addEventListener('ended', release, { once: true })
+  element.addEventListener('error', release, { once: true })
+  try {
+    await element.play()
+  } catch (reason) {
+    release()
+    throw reason
+  }
 }

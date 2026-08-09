@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { speak } from './browser'
+import { playAudio, speak } from './browser'
 
 type Voice = { lang: string; name: string }
 
@@ -70,6 +70,17 @@ describe('speak', () => {
     expect(spoken).toHaveLength(0)
   })
 
+  it('states only what it knows, leaving the caller free to try the device', async () => {
+    // The reason used to end "so the reply is shown but not spoken", which is now
+    // premature: the device's own synthesiser is asked next and usually speaks it.
+    const { spoken } = withSynthesis([{ lang: 'en-US', name: 'English' }])
+
+    const outcome = await speak('আপনি ভালো আছেন।', 'bn-BD')
+
+    expect(outcome.spoken === false && outcome.reason).not.toContain('not spoken')
+    expect(spoken).toHaveLength(0)
+  })
+
   it('reports a browser that cannot speak at all', async () => {
     vi.unstubAllGlobals()
     const original = Object.getOwnPropertyDescriptor(window, 'speechSynthesis')
@@ -80,5 +91,41 @@ describe('speak', () => {
 
     expect(outcome.spoken).toBe(false)
     if (original) Object.defineProperty(window, 'speechSynthesis', original)
+  })
+})
+
+describe('playAudio', () => {
+  function withAudio(play: () => Promise<void>) {
+    const revoked: string[] = []
+    vi.stubGlobal('URL', {
+      createObjectURL: () => 'blob:manny-speech',
+      revokeObjectURL: (url: string) => revoked.push(url),
+    })
+    const listeners = new Map<string, () => void>()
+    vi.stubGlobal('Audio', class {
+      constructor(public src: string) {}
+      addEventListener(name: string, handler: () => void) { listeners.set(name, handler) }
+      play = play
+    })
+    return { revoked, listeners }
+  }
+
+  it('plays speech the device synthesised for a language the browser lacks', async () => {
+    const { revoked, listeners } = withAudio(() => Promise.resolve())
+
+    await playAudio(new Blob([new Uint8Array([1, 2])], { type: 'audio/wav' }))
+
+    expect(revoked).toHaveLength(0)
+    // Released on ending rather than on start, so a long session does not
+    // accumulate blob URLs for every reply Manny speaks.
+    listeners.get('ended')?.()
+    expect(revoked).toEqual(['blob:manny-speech'])
+  })
+
+  it('releases the blob and rethrows when playback is refused', async () => {
+    const { revoked } = withAudio(() => Promise.reject(new Error('autoplay blocked')))
+
+    await expect(playAudio(new Blob([new Uint8Array([1])]))).rejects.toThrow('autoplay blocked')
+    expect(revoked).toEqual(['blob:manny-speech'])
   })
 })

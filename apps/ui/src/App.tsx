@@ -19,6 +19,7 @@ import {
   clearMemory,
   getSecurity,
   getReminders,
+  synthesizeSpeech,
 } from './api/client'
 import FinanceDashboard from './components/FinanceDashboard'
 import CameraPresence from './components/CameraPresence'
@@ -29,7 +30,7 @@ import InsightsView from './components/InsightsView'
 import OnScreenKeyboard from './components/OnScreenKeyboard'
 import AlertsView from './components/AlertsView'
 import type { AgentResponse, FinanceDashboardData, MCPStatus, MemoryStats, PublicSettings, Reminder, SecurityStatus, RuntimeSnapshot, RuntimeState } from './types'
-import { listenOnce, speak, supportsBrowserVoice } from './voice/browser'
+import { listenOnce, playAudio, speak, supportsBrowserVoice } from './voice/browser'
 
 const initialState: RuntimeSnapshot = {
   state: 'BOOTING',
@@ -231,11 +232,20 @@ function App() {
   }
 
   async function announce(text: string, language: string) {
-    // Speech depends on voices the operating system provides, and a Bengali or Hindi
-    // voice is absent from a default Windows install. Say so rather than leaving the
-    // user to wonder whether the speaker is broken.
+    // Browser speech depends on voices the operating system provides, and a default
+    // Windows install has none outside English — so Bengali and Hindi replies were
+    // displayed and never spoken.
     const outcome = await speak(text, language)
-    if (!outcome.spoken) setError(outcome.reason)
+    if (outcome.spoken) return
+    // The device's own synthesiser covers far more languages than any desktop voice
+    // set, so ask it before giving up. Only if that fails too is the reply genuinely
+    // unspeakable here, and then the message names both reasons: the browser has no
+    // voice, and this is what the device said when asked to cover for it.
+    try {
+      await playAudio(await synthesizeSpeech(text, language))
+    } catch (reason) {
+      setError(`${outcome.reason} ${messageFrom(reason)}`)
+    }
   }
 
   async function submitQuestion(event: FormEvent<HTMLFormElement>) {

@@ -56,6 +56,23 @@ class HalfDuplexVoiceCoordinator:
         """
         return self._turn_lock.locked()
 
+    async def synthesize(self, text: str, *, language: str) -> AudioBuffer:
+        """Speech for a reply that has already been answered and shown.
+
+        The simulator needs this because browser speech synthesis can only use
+        voices the host operating system installed, and a default Windows install
+        has none outside English — so a Bengali reply was displayed and never
+        spoken. Routing it back through the configured adapter means the desktop
+        speaks with the same eSpeak NG the device does, in the same languages.
+
+        Deliberately outside the turn lock. It plays nothing itself, so it cannot
+        make Manny record its own speech, and blocking on an in-flight turn would
+        only delay saying something the user is already reading.
+        """
+        if not text.strip():
+            raise ValueError("There was nothing to say")
+        return await self._tts.synthesize(text, voice=self._voice, language=language)
+
     async def run_turn(
         self,
         audio: AudioBuffer,

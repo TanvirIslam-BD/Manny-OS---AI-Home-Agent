@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import shutil
 from dataclasses import dataclass
 from datetime import time
+from pathlib import Path
 from typing import Any
 
 from manny.agent import OllamaAgentModel, RuleBasedAgent, ToolBroker
@@ -313,7 +315,7 @@ def build_services(settings: Settings) -> RuntimeServices:
         stt = MockSpeechToText()
     tts: TextToSpeech
     if settings.tts_backend == "espeak_ng":
-        tts = EspeakTextToSpeech(settings.espeak_ng_binary)
+        tts = EspeakTextToSpeech(_espeak_binary(settings.espeak_ng_binary))
     elif settings.tts_backend == "kokoro":
         tts = KokoroTextToSpeech()
     else:
@@ -396,6 +398,24 @@ def build_services(settings: Settings) -> RuntimeServices:
     )
     mcp.set_listener(services._on_mcp_status)
     return services
+
+
+def _espeak_binary(configured: Path) -> Path:
+    """The configured binary, or the one on PATH when it is not where Linux puts it.
+
+    The default is `/usr/bin/espeak-ng` because that is where the Pi installer puts
+    it and what the device profiles name explicitly. A developer running the
+    simulator on Windows or macOS has it somewhere else entirely, and requiring a
+    per-platform path in every profile just to hear a reply is friction that keeps
+    people on browser voices — which cannot speak most of the languages Manny
+    claims. Falling back to PATH is a lookup, not a substitution: an unresolved
+    name is returned unchanged so synthesis still fails loudly rather than
+    silently picking some other program.
+    """
+    if configured.exists():
+        return configured
+    found = shutil.which(configured.name) or shutil.which(configured.stem)
+    return Path(found) if found else configured
 
 
 async def _deliver_notification(

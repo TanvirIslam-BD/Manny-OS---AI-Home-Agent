@@ -281,6 +281,7 @@ The source of truth is `apps/core/manny/api/routes.py`. The primary endpoints ar
 | POST | `/api/agent/query` | Submit typed user input |
 | POST | `/api/interaction/push-to-talk` | Start/stop a voice interaction |
 | POST | `/api/interaction/voice/simulate` | Exercise voice behavior without hardware |
+| POST | `/api/voice/speak` | Synthesize a reply the browser has no voice for (WAV) |
 | POST | `/api/interaction/cancel` | Cancel the active interaction |
 | POST | `/api/privacy/lock` | Enter privacy lock |
 | GET/POST | `/api/reminders` | List or create reminders |
@@ -303,6 +304,16 @@ On Raspberry Pi, Whisper base provides automatic local language detection and eS
 provides broad offline speech output. Voice availability and pronunciation quality vary by
 language, so production acceptance testing must cover every promised language on the actual
 speaker and microphone hardware.
+
+On the desktop the simulator speaks through the browser, which can only use voices the host
+operating system installed — a default Windows install ships English only, so most languages
+Manny supports have no voice there. Rather than read Bengali script with an English voice,
+which is noise, the simulator asks the API to synthesize the reply over `POST
+/api/voice/speak` and plays the returned WAV. That path uses the same eSpeak NG adapter the
+device does. It is off unless `MANNY_TTS_BACKEND=espeak_ng` and eSpeak NG is installed
+locally; with the default `mock` backend the endpoint refuses rather than returning the
+placeholder audio as though it were speech. An `espeak-ng` on PATH is found without
+configuring a path, so the same profile works on Linux, macOS, and Windows.
 
 When adding a language:
 

@@ -4,7 +4,15 @@ from __future__ import annotations
 
 from typing import Annotated, Literal, cast
 
-from fastapi import APIRouter, Depends, HTTPException, Request, WebSocket, WebSocketDisconnect
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+    Request,
+    Response,
+    WebSocket,
+    WebSocketDisconnect,
+)
 from fastapi.responses import RedirectResponse
 from mcp.shared.auth import AuthorizationCodeResult
 from pydantic import BaseModel, Field
@@ -51,6 +59,16 @@ class VoiceSimulationResponse(BaseModel):
     answer: str
     tool_name: str | None = None
     language: str = "en"
+
+
+class SpeechRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=500)
+    language: str = Field(
+        default="en",
+        min_length=2,
+        max_length=35,
+        pattern=rf"^(?:auto|{LANGUAGE_TAG_PATTERN.pattern[1:-1]})$",
+    )
 
 
 class ListeningRequest(BaseModel):
@@ -208,6 +226,41 @@ async def simulate_voice(
         tool_name=result.tool_name,
         language=result.language,
     )
+
+
+@router.post(
+    "/voice/speak",
+    responses={200: {"content": {"audio/wav": {}}, "description": "Synthesised speech"}},
+)
+async def speak_reply(body: SpeechRequest, services: Services) -> Response:
+    """Say a reply the browser has no voice for.
+
+    Browser speech synthesis can only use voices the host operating system
+    installed, and a default Windows install has none outside English, so Bengali
+    and Hindi replies were shown and never spoken. This hands the same text to the
+    adapter the device speaks with, which covers far more languages than any
+    desktop voice set.
+
+    It refuses rather than degrades. The mock backend returns the text itself as
+    the audio payload, so serving that as a WAV would produce noise dressed up as
+    speech — the fabricated-output failure the honest-degradation invariant
+    forbids. No text is stored or logged: it is synthesised and streamed back.
+    """
+    if services.settings.tts_backend == "mock":
+        raise HTTPException(
+            status_code=503,
+            detail="This device has no local speech synthesis configured.",
+        )
+    try:
+        audio = await services.voice.synthesize(body.text, language=body.language)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from None
+    except RuntimeError:
+        raise HTTPException(
+            status_code=503,
+            detail="Local speech synthesis is configured but did not answer.",
+        ) from None
+    return Response(content=audio.to_wav(), media_type="audio/wav")
 
 
 @router.post("/interaction/cancel", response_model=RuntimeSnapshot)

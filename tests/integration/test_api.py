@@ -1,8 +1,12 @@
+import io
+import wave
+
 import pytest
 from fastapi.testclient import TestClient
 
 from manny.config import Settings
 from manny.main import create_app
+from manny.voice import AudioBuffer
 
 
 def build_client() -> TestClient:
@@ -200,3 +204,81 @@ def test_a_spoken_reminder_is_broadcast_to_the_alerts_screen() -> None:
     created = [event for event in events if event["type"] == "notification.created"]
     assert created, "the Alerts screen would not learn about a spoken reminder"
     assert created[0]["payload"]["title"] == "stretch"
+
+
+class _StubTextToSpeech:
+    """Stands in for eSpeak NG so the suite does not need it installed."""
+
+    def __init__(self, failing: bool = False) -> None:
+        self._failing = failing
+
+    async def synthesize(self, text: str, voice: str, language: str = "en") -> AudioBuffer:
+        del voice
+        if self._failing:
+            raise RuntimeError("local multilingual speech synthesis failed")
+        return AudioBuffer(pcm=b"\x00\x01" * 512, sample_rate=22_050, language_hint=language)
+
+
+def build_speaking_client(monkeypatch: pytest.MonkeyPatch, *, failing: bool = False) -> TestClient:
+    monkeypatch.setattr(
+        "manny.lifecycle.EspeakTextToSpeech",
+        lambda _binary: _StubTextToSpeech(failing=failing),
+    )
+    return TestClient(
+        create_app(
+            Settings(
+                environment="test",
+                config_profile="development",
+                mcp_mode="mock",
+                tts_backend="espeak_ng",
+                _env_file=None,
+            )
+        )
+    )
+
+
+def test_speech_is_refused_when_the_device_has_no_synthesizer() -> None:
+    # The mock backend returns the text itself as its audio payload. Serving that as
+    # a WAV would be noise presented as speech, so the endpoint declines instead.
+    with build_client() as client:
+        response = client.post(
+            "/api/voice/speak", json={"text": "আপনার বাজেট ভালো আছে।", "language": "bn"}
+        )
+
+    assert response.status_code == 503
+    assert "no local speech synthesis" in response.json()["detail"]
+
+
+def test_a_reply_the_browser_cannot_say_is_synthesized_by_the_device(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # The bug: a default Windows install ships no Bengali voice, so browser speech
+    # displayed the reply and stayed silent. The device's own synthesiser covers it.
+    with build_speaking_client(monkeypatch) as client:
+        response = client.post(
+            "/api/voice/speak", json={"text": "আপনার বাজেট ভালো আছে।", "language": "bn"}
+        )
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "audio/wav"
+    with wave.open(io.BytesIO(response.content), "rb") as audio:
+        assert audio.getframerate() == 22_050
+        assert audio.getsampwidth() == 2
+        assert audio.getnframes() == 512
+
+
+def test_a_synthesizer_that_fails_says_so_rather_than_returning_silence(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with build_speaking_client(monkeypatch, failing=True) as client:
+        response = client.post("/api/voice/speak", json={"text": "Hello.", "language": "en"})
+
+    assert response.status_code == 503
+    assert "did not answer" in response.json()["detail"]
+
+
+def test_speech_rejects_a_reply_with_nothing_to_say(monkeypatch: pytest.MonkeyPatch) -> None:
+    with build_speaking_client(monkeypatch) as client:
+        response = client.post("/api/voice/speak", json={"text": "   ", "language": "en"})
+
+    assert response.status_code == 422

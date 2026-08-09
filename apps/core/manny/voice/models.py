@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import io
+import wave
+
 from pydantic import BaseModel, ConfigDict, Field
 
 from manny.i18n import LANGUAGE_TAG_PATTERN
@@ -19,6 +22,22 @@ class AudioBuffer(BaseModel):
         max_length=35,
         pattern=rf"^(?:auto|{LANGUAGE_TAG_PATTERN.pattern[1:-1]})$",
     )
+
+    def to_wav(self) -> bytes:
+        """Wrap the samples in a WAV container for transport to a browser.
+
+        Adapters return bare signed 16-bit PCM because the speaker adapters accept
+        it directly, but a browser needs a container it can decode. WAV costs a
+        44-byte header and no codec dependency, which matters on a device that
+        already budgets memory for a model.
+        """
+        buffer = io.BytesIO()
+        with wave.open(buffer, "wb") as output:
+            output.setnchannels(self.channels)
+            output.setsampwidth(2)
+            output.setframerate(self.sample_rate)
+            output.writeframes(self.pcm)
+        return buffer.getvalue()
 
 
 class Transcript(BaseModel):

@@ -8,6 +8,7 @@ from types import SimpleNamespace
 import pytest
 
 from manny.agent import RuleBasedAgent, ToolBroker
+from manny.lifecycle import _espeak_binary
 from manny.mcp import MockMCPClient
 from manny.policy import PolicyEngine
 from manny.state import PrivacyState, RuntimeState, StateMachine
@@ -165,3 +166,63 @@ def test_reply_language_follows_the_answer_not_a_romanized_question() -> None:
     # A Latin reply keeps whatever the request resolved to.
     assert _spoken_language("I'm doing well", "bn-BD") == "bn-BD"
     assert _spoken_language("I'm doing well", "en") == "en"
+
+
+def test_audio_is_packaged_as_a_wav_a_browser_can_decode() -> None:
+    # Adapters return bare PCM because the speaker adapters take it directly. A
+    # browser needs the container, and getting the header wrong is silent: the
+    # element simply refuses to play.
+    buffer = AudioBuffer(pcm=b"\x00\x01" * 300, sample_rate=22_050, channels=1)
+
+    with wave.open(io.BytesIO(buffer.to_wav()), "rb") as audio:
+        assert audio.getnchannels() == 1
+        assert audio.getsampwidth() == 2
+        assert audio.getframerate() == 22_050
+        assert audio.readframes(audio.getnframes()) == buffer.pcm
+
+
+@pytest.mark.asyncio
+async def test_a_shown_reply_can_be_spoken_without_running_a_turn() -> None:
+    # The simulator answers over /api/agent/query and never touches the coordinator,
+    # so speaking that reply has to work outside a voice turn.
+    state = StateMachine()
+    agent = RuleBasedAgent(ToolBroker(MockMCPClient(), PolicyEngine()), remote=False)
+    voice = HalfDuplexVoiceCoordinator(
+        stt=MockSpeechToText(),
+        tts=MockTextToSpeech(),
+        vad=MockVoiceActivity(),
+        agent=agent,
+        state=state,
+    )
+
+    audio = await voice.synthesize("আপনার বাজেট ভালো আছে।", language="bn")
+
+    assert audio.pcm == "আপনার বাজেট ভালো আছে।".encode()
+    with pytest.raises(ValueError):
+        await voice.synthesize("   ", language="bn")
+
+
+def test_espeak_is_found_on_path_when_it_is_not_where_linux_puts_it(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    # The default points at the Pi installer's location. A desktop developer on
+    # Windows or macOS has it elsewhere, and requiring a per-platform path in every
+    # profile is what keeps people on browser voices that cannot speak Bengali.
+    installed = tmp_path / "espeak-ng.exe"
+    installed.write_text("", encoding="utf-8")
+    monkeypatch.setattr(
+        "manny.lifecycle.shutil.which",
+        lambda name: str(installed) if name == "espeak-ng" else None,
+    )
+
+    assert _espeak_binary(Path("/usr/bin/espeak-ng")) == installed
+
+
+def test_an_unresolvable_espeak_is_returned_unchanged_rather_than_substituted(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Returning some other program would be worse than failing: synthesis must fail
+    # loudly rather than speak with whatever happened to be on PATH.
+    monkeypatch.setattr("manny.lifecycle.shutil.which", lambda _name: None)
+
+    assert _espeak_binary(Path("/usr/bin/espeak-ng")) == Path("/usr/bin/espeak-ng")
