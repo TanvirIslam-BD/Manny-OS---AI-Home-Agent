@@ -21,9 +21,20 @@ Before relying on a tag, confirm what it is: `ollama show <tag>` reports its par
 ## Fitting the conversational model in 8 GB
 
 An E2B-class model stores far more than it activates: roughly 2B active parameters
-out of a larger set held as per-layer embeddings. Whether it fits depends on the
-runtime keeping only the active part resident and faulting the rest from storage. That
-is a property of the runtime, not the model, so it has to be measured:
+out of a larger set held as per-layer embeddings. `gemma4:e2b`'s model layer is
+**6.67 GB** — read from the registry manifest, not estimated — against `gemma4:e4b` at
+8.95 GB and `gemma3n:e2b` at 5.24 GB. No smaller quantisation of `gemma4` is
+published.
+
+That file does not fit an 8 GB board fully resident: about 1.5 GB is committed before
+the model loads (below), leaving roughly 6.3 GB of about 7.8 GB usable. It works
+anyway only because Ollama mmaps its weights, so what has to be resident is the hot
+working set rather than the file. For a ~2B-active model that is far smaller — but the
+cold pages have to come from somewhere fast, which is why NVMe is required here and a
+microSD card is not sufficient.
+
+Whether the working set really is small enough is a property of the runtime, not the
+model, so it has to be measured:
 
 ```bash
 ollama ps          # resident size while the model is loaded
@@ -44,7 +55,8 @@ The rest of the board, approximately:
 | whisper.cpp, only while transcribing | ~0.4 GB |
 
 So roughly 1.5 GB is committed before the model loads, against about 7.8 GB usable
-after GPU/CMA reservation. Comfortable if the model is near 2–3 GB; not if it is 5–6.
+after GPU/CMA reservation — about 6.3 GB for the model. Comfortable if `ollama ps`
+reports 2–3 GB resident; not if it reports anything approaching the 6.67 GB on disk.
 
 What the configuration already does to help:
 

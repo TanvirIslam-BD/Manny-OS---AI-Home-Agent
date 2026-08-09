@@ -206,12 +206,22 @@ Predictability is traded for flexibility. A model manager can unload between tur
 where a pinned llama-server never did, so `OLLAMA_KEEP_ALIVE=-1` is set to stop a
 multi-second reload landing mid-conversation.
 
-Two things are unverified and deliberately not written down as if they were known.
-Whether the tag resolves, and what it occupies resident — an E2B model only fits
-8 GB if the runtime offloads its per-layer embeddings, so no memory ceiling is set
-anywhere until `ollama ps` has been read on the device. If it does not fit, the
-options are a 16 GB board, dropping the Chromium kiosk, or a smaller tag; the last of
-those is now one environment variable.
+The tag was confirmed against the Ollama registry manifest rather than assumed: it
+exists, and its model layer is 6.67 GB. `gemma4:e4b` is 8.95 GB and `gemma3n:e2b` —
+the previous generation of the same class — is 5.24 GB. No smaller quantisation of
+`gemma4` is published.
+
+6.67 GB does not fit an 8 GB board as a fully resident model. Roughly 1.5 GB is
+already committed to the desktop session, the Chromium kiosk, the core and whisper,
+leaving about 6.3 GB. Two things make it viable anyway: Ollama mmaps its weights, so
+only the hot working set needs to be resident and for a ~2B-active model that is far
+smaller than the file — provided cold pages are served from NVMe rather than a
+microSD card — and the kiosk can be dropped for about 1.5 GB. A 16 GB board fits it
+outright, at the same speed, since bandwidth is unchanged.
+
+What remains unmeasured is the resident size in practice. No memory ceiling is set
+anywhere until `ollama ps` has been read on the device, because a guessed ceiling
+either does nothing or kills the model weeks later.
 
 Storage moved into the inference path. A partially offloaded model faults to disk
 during generation, so NVMe is required rather than optional — which reverses the
