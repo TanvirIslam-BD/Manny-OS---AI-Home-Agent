@@ -24,7 +24,7 @@ llm_base_url: http://127.0.0.1:11434
 # the per-layer embeddings — check `ollama ps` on the device before trusting the
 # memory ceiling. The model classifies intent and drafts wording only; the policy
 # broker makes every MCP call (ADR-020).
-llm_model: gemma4:e2b
+llm_model: gemma3n:e2b
 llm_timeout_seconds: 60
 llm_max_tokens: 320
 # Four rather than six. Every turn is prompt tokens, which costs both prefill time
@@ -41,4 +41,4 @@ llm_context_turns: 4
 # input has historically lagged the text path.
 vision_language_backend: none
 vision_language_base_url: http://127.0.0.1:11434
-vision_language_model: gemma4:e2b
+vision_language_model: gemma3n:e2b

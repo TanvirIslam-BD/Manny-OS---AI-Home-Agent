@@ -15,7 +15,7 @@
 ## External validation gates
 
 - [ ] Select the final display, camera, microphone, speaker/amplifier, LED controller, controls, and GPIO mapping.
-- [ ] Benchmark multilingual Whisper base, eSpeak NG, `gemma4:e2b`, and the person detector together on Raspberry Pi 5 8 GB, including English, Bangla, Hindi, Mandarin Chinese, and Japanese acceptance samples.
+- [ ] Benchmark multilingual Whisper base, eSpeak NG, `gemma3n:e2b`, and the person detector together on Raspberry Pi 5 8 GB, including English, Bangla, Hindi, Mandarin Chinese, and Japanese acceptance samples.
 - [ ] Run `scripts/verify_hardware.sh` and physical camera/audio/display/privacy tests.
 - [ ] Validate touch, motion, acoustics, wake-word errors, thermal behavior, and power recovery on-device.
 - [ ] Provision the production OS keyring, OAuth policy, Minisign signing key, and public verification key.

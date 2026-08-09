@@ -11,7 +11,7 @@
 # adopting Ollama gives up, and it is recorded as a consequence rather than hidden.
 set -euo pipefail
 
-model="${MANNY_OLLAMA_MODEL:-gemma4:e2b}"
+model="${MANNY_OLLAMA_MODEL:-gemma3n:e2b}"
 install_root=/opt/manny
 drop_in_dir=/etc/systemd/system/ollama.service.d
 

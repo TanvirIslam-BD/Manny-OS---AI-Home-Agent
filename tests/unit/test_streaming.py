@@ -124,7 +124,7 @@ def build_model(document: str) -> tuple[OllamaAgentModel, list[dict[str, object]
 
     model = OllamaAgentModel(
         base_url="http://127.0.0.1:11434",
-        model="gemma4:e2b",
+        model="gemma3n:e2b",
         timeout_seconds=5,
         max_tokens=320,
         transport=httpx.MockTransport(handler),
@@ -193,7 +193,7 @@ async def test_without_a_listener_the_request_is_not_streamed() -> None:
 
     model = OllamaAgentModel(
         base_url="http://127.0.0.1:11434",
-        model="gemma4:e2b",
+        model="gemma3n:e2b",
         timeout_seconds=5,
         max_tokens=320,
         transport=httpx.MockTransport(handler),

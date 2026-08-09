@@ -4,15 +4,15 @@ Manny targets Raspberry Pi 5 8 GB **with NVMe** on 64-bit Raspberry Pi OS. The N
 
 Device configuration includes `MANNY_AUDIO_DEVICE`, optional LED/display sysfs paths, camera privacy state, and the selected local STT/TTS/LLM backends.
 
-Run `scripts/bootstrap_pi.sh` only after review. It verifies ARM64 Raspberry Pi hardware, asks for confirmation, installs prerequisites, and creates the service user. Run `scripts/install_app_pi.sh` from the reviewed source tree to copy Manny into `/opt/manny`, create its Python environment, and build the UI. Install `configs/raspberrypi.env.example` as `/opt/manny/.env` with mode `0600`, then replace its placeholder timezone and MCP endpoint. Next run `/opt/manny/scripts/install_ollama_pi.sh` and `scripts/install_multilingual_voice_pi.sh`; the first installs a checksum-verified Ollama runtime, applies Manny's hardening drop-in, and pulls `gemma4:e2b`, while the second builds pinned whisper.cpp source, downloads the checksum-verified multilingual Whisper base model, and installs eSpeak NG. `install_ollama_pi.sh` does enable `ollama.service`, because a model cannot be pulled without it; nothing else is enabled. Run `scripts/verify_hardware.sh`, and explicitly install/enable `manny-core` and `manny-kiosk` only after validation.
+Run `scripts/bootstrap_pi.sh` only after review. It verifies ARM64 Raspberry Pi hardware, asks for confirmation, installs prerequisites, and creates the service user. Run `scripts/install_app_pi.sh` from the reviewed source tree to copy Manny into `/opt/manny`, create its Python environment, and build the UI. Install `configs/raspberrypi.env.example` as `/opt/manny/.env` with mode `0600`, then replace its placeholder timezone and MCP endpoint. Next run `/opt/manny/scripts/install_ollama_pi.sh` and `scripts/install_multilingual_voice_pi.sh`; the first installs a checksum-verified Ollama runtime, applies Manny's hardening drop-in, and pulls `gemma3n:e2b`, while the second builds pinned whisper.cpp source, downloads the checksum-verified multilingual Whisper base model, and installs eSpeak NG. `install_ollama_pi.sh` does enable `ollama.service`, because a model cannot be pulled without it; nothing else is enabled. Run `scripts/verify_hardware.sh`, and explicitly install/enable `manny-core` and `manny-kiosk` only after validation.
 
 The default Pi inference budget is one conversational model, a 148 MB multilingual Whisper model, a 4,096-token runtime context, and one loaded model at a time. No systemd memory ceiling is set: the conversational model's resident size is unmeasured, and a guessed ceiling either does nothing or OOM-kills the model long after deployment. These are starting values, not performance claims; simultaneous STT, LLM, TTS, camera, latency, thermals, memory, and power must be measured on the actual Pi 5 enclosure.
 
-`gemma4:e2b` is the conversational default and also handles image input, which is why no separate vision model or second server exists any more (ADR-020). The local model never calls a tool: it returns a schema-constrained intent and wording, and the policy broker performs every MCP request, so its job is classification and phrasing rather than tool use.
+`gemma3n:e2b` is the conversational default and also handles image input, which is why no separate vision model or second server exists any more (ADR-020). The local model never calls a tool: it returns a schema-constrained intent and wording, and the policy broker performs every MCP request, so its job is classification and phrasing rather than tool use.
 
 The Pi 5 has no usable GPU offload, so generation is bound by memory bandwidth. An E2B-class model carries around 2B active parameters out of a larger stored set, and whether it fits 8 GB depends on the runtime offloading its per-layer embeddings. Read `ollama ps` on the device before trusting any memory figure; nothing here sets a ceiling for that reason. A partially offloaded model also faults to disk mid-generation, which makes NVMe part of the inference path rather than a build-time convenience.
 
-`MANNY_OLLAMA_MODEL` selects the tag `install_ollama_pi.sh` pulls, defaulting to `gemma4:e2b`, and `MANNY_LLM_MODEL` in `/opt/manny/.env` must name the same tag so the core asks for something that is present. Changing models is now one variable and a pull rather than a source build.
+`MANNY_OLLAMA_MODEL` selects the tag `install_ollama_pi.sh` pulls, defaulting to `gemma3n:e2b`, and `MANNY_LLM_MODEL` in `/opt/manny/.env` must name the same tag so the core asks for something that is present. Changing models is now one variable and a pull rather than a source build.
 
 The runtime binary is checksum-verified: `MANNY_OLLAMA_URL` and `MANNY_OLLAMA_SHA256` are required and the installer refuses without them, because a service binary is arbitrary code execution rather than data. Model pulls are **not** verified — Ollama's registry offers no equivalent to a pinned SHA, and giving that guarantee up is what adopting Ollama costs (ADR-020).
 
@@ -21,10 +21,23 @@ Before relying on a tag, confirm what it is: `ollama show <tag>` reports its par
 ## Fitting the conversational model in 8 GB
 
 An E2B-class model stores far more than it activates: roughly 2B active parameters
-out of a larger set held as per-layer embeddings. `gemma4:e2b`'s model layer is
-**6.67 GB** — read from the registry manifest, not estimated — against `gemma4:e4b` at
-8.95 GB and `gemma3n:e2b` at 5.24 GB. No smaller quantisation of `gemma4` is
-published.
+out of a larger set held as per-layer embeddings. Sizes read from the registry
+manifest rather than estimated:
+
+| Tag | Model layer | Against ~6.3 GB available |
+| --- | --- | --- |
+| `gemma3n:e2b` | 5.24 GB | fits, can be fully resident, **the default** |
+| `gemma4:e2b` | 6.67 GB | exceeds it; only runs partially resident |
+| `gemma4:e4b` | 8.95 GB | no |
+
+No smaller quantisation of either is published, so there is no cheaper variant of
+this choice.
+
+The default was chosen to fit rather than to be best. Even at 5.24 GB, Ollama mmaps
+its weights, so what has to be resident is the hot working set rather than the whole
+file, which is why NVMe is required here and a microSD card is not sufficient. Cold
+pages are faulted during generation, and read latency shows up as pauses
+mid-sentence.
 
 That file does not fit an 8 GB board fully resident: about 1.5 GB is committed before
 the model loads (below), leaving roughly 6.3 GB of about 7.8 GB usable. It works
@@ -93,9 +106,16 @@ If `ollama ps` still reports more than the board can hold, the levers in order a
 
 1. **Drop the kiosk.** `systemctl disable --now manny-kiosk` frees roughly 1.5 GB, and
    the UI still works from another machine's browser on the same network.
-2. **A smaller model.** `MANNY_OLLAMA_MODEL=gemma3n:e2b` is 5.24 GB, the previous
-   generation of the same architecture — one variable and a pull.
-3. **A 16 GB board.** It fits outright, at the same speed; bandwidth is unchanged.
+2. **A 16 GB board.** It fits either model outright, at the same speed; bandwidth is
+   unchanged.
+
+Running `gemma4:e2b` instead is one variable and a pull, once `ollama ps` has shown
+there is room for it:
+
+```bash
+sudo MANNY_OLLAMA_MODEL=gemma4:e2b ./scripts/install_ollama_pi.sh
+# then set MANNY_LLM_MODEL=gemma4:e2b in /opt/manny/.env
+```
 
 Storage is part of this. A partially offloaded model faults to disk during
 generation, so NVMe belongs in the inference path: roughly 400+ MB/s random read

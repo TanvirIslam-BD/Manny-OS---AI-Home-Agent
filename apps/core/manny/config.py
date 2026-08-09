@@ -75,7 +75,11 @@ class Settings(BaseSettings):
     tts_voice: str = Field(default="", max_length=64)
     llm_backend: Literal["mock", "ollama"] = "mock"
     llm_base_url: str = "http://127.0.0.1:11434"
-    llm_model: str = "gemma4:e2b"
+    # 5.24 GB, which fits under the ~6.3 GB an 8 GB board has left after the desktop
+    # session, kiosk, core and whisper. gemma4:e2b is the newer model of the same class
+    # and is better, but at 6.67 GB it exceeds that outright and can only run as a
+    # partially resident mmap — fine once measured, not a default (ADR-021).
+    llm_model: str = "gemma3n:e2b"
     llm_timeout_seconds: float = Field(default=60, gt=0, le=180)
     llm_max_tokens: int = Field(default=320, ge=32, le=512)
     llm_context_turns: int = Field(default=6, ge=1, le=12)
@@ -116,7 +120,7 @@ class Settings(BaseSettings):
     # the point of choosing one that is (ADR-020) — the separate port and separate
     # weights were llama.cpp constraints, not requirements.
     vision_language_base_url: str = "http://127.0.0.1:11434"
-    vision_language_model: str = "gemma4:e2b"
+    vision_language_model: str = "gemma3n:e2b"
     vision_language_timeout_seconds: float = Field(default=120, gt=0, le=300)
     person_detector: Literal["none", "opencv_hog"] = "none"
     face_recognition_enabled: bool = False

@@ -41,7 +41,7 @@ These rules are architectural constraints, not optional conventions:
   authoritative application state machine
 - Official MCP Python SDK v2 client using Streamable HTTP and OAuth 2.1 authorization
 - Validated live budget/category dashboard with disclosed cache age during outages
-- Local `gemma4:e2b` companion, text and image, through a loopback-only Ollama daemon
+- Local `gemma3n:e2b` companion, text and image, through a loopback-only Ollama daemon
 - Multilingual typed and spoken interaction with automatic language detection
 - Local Whisper speech-to-text and eSpeak NG text-to-speech on Raspberry Pi
 - Browser microphone, speech synthesis, and camera presence simulation on desktop
@@ -246,7 +246,7 @@ Useful commands:
 Install Ollama for Windows from its own installer, then:
 
 ```powershell
-ollama pull gemma4:e2b
+ollama pull gemma3n:e2b
 ollama serve
 ```
 

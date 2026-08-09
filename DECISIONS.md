@@ -179,7 +179,7 @@ second llama-server, not switching the conversational model back.
 Status: Accepted
 
 Decision: Ollama replaces llama.cpp as the only local inference runtime, and the
-conversational model becomes `gemma4:e2b` — an E2B-class model of roughly 2B active
+conversational model becomes an E2B-class model of roughly 2B active
 parameters drawn from a larger stored model, natively capable of text and image.
 Supersedes ADR-015's choice of runtime and ADR-019's choice of model. Speech
 recognition stays on whisper.cpp.
@@ -234,16 +234,22 @@ Reverting means restoring `install_gemma_pi.sh`, `manny-llm.service` and the
 
 Status: Accepted
 
-Decision: Manny targets a Raspberry Pi 5 8 GB with an NVMe drive, running
-`gemma4:e2b` whose model layer is 6.67 GB. NVMe is a requirement, not an upgrade.
+Decision: Manny targets a Raspberry Pi 5 8 GB with an NVMe drive, and the default
+model is `gemma3n:e2b` at 5.24 GB rather than `gemma4:e2b` at 6.67 GB. NVMe is a
+requirement, not an upgrade.
 
-Rationale: the model file is larger than the memory left for it — roughly 6.3 GB of
-7.8 GB usable, once the desktop session, Chromium kiosk, core and whisper have taken
-their share. It loads anyway because Ollama mmaps its weights, so what must be
-resident is the hot working set rather than the whole file, and for a model with
-around 2B active parameters that is far smaller. A 16 GB board would fit it outright
-at identical speed, since memory bandwidth is unchanged; 8 GB with NVMe was chosen
-instead, which makes the offloading mechanism load-bearing rather than incidental.
+Rationale: an 8 GB board has roughly 6.3 GB left for a model once the desktop
+session, Chromium kiosk, core and whisper have taken their share, out of about
+7.8 GB usable. Both candidates were measured from the registry manifest rather than
+estimated, and the difference between them is categorical rather than marginal.
+5.24 GB fits under that figure and can be fully resident if it needs to be. 6.67 GB
+exceeds it outright and can only ever run as a partially resident mmap, which does
+work, since Ollama mmaps its weights and a 2B-active model touches far less than its
+file, but works conditionally on behaviour nobody has measured on this board.
+
+`gemma4:e2b` is the better model and the intended destination. It is a documented
+one-variable switch rather than the default, because a default should boot on the
+target hardware without requiring a measurement first.
 
 Consequences:
 
@@ -263,7 +269,7 @@ the model, and `vm.swappiness=100` biases the kernel toward doing that rather th
 dropping model pages. SD-card swap is disabled outright, since a fault there during
 generation is indistinguishable from a hang.
 
-There is little margin. If measurement on the device shows the working set is larger
-than hoped, the levers in order are dropping the Chromium kiosk for about 1.5 GB,
-switching to `gemma3n:e2b` at 5.24 GB — one environment variable — or moving to a
-16 GB board. `ollama ps` is what decides.
+Margin is thin even at 5.24 GB. If measurement disappoints, the levers in order are
+dropping the Chromium kiosk for about 1.5 GB, or moving to a 16 GB board, which fits
+either model outright at identical speed since bandwidth is unchanged. Going the
+other way, to `gemma4:e2b`, is the same single variable once `ollama ps` shows room.

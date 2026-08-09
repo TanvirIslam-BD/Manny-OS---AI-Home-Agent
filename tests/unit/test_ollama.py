@@ -13,7 +13,7 @@ from manny.state import PrivacyState
 def model(transport: httpx.AsyncBaseTransport) -> OllamaAgentModel:
     return OllamaAgentModel(
         base_url="http://127.0.0.1:11434",
-        model="gemma4:e2b",
+        model="gemma3n:e2b",
         timeout_seconds=2,
         max_tokens=128,
         transport=transport,
@@ -25,7 +25,7 @@ async def test_the_local_model_uses_a_loopback_schema_constrained_completion() -
     async def handler(request: httpx.Request) -> httpx.Response:
         payload = json.loads(request.content)
         assert request.url == "http://127.0.0.1:11434/v1/chat/completions"
-        assert payload["model"] == "gemma4:e2b"
+        assert payload["model"] == "gemma3n:e2b"
         assert payload["response_format"]["json_schema"]["strict"] is True
         # The instruction must lead as a stable system message so llama.cpp can
         # keep it in the prompt cache; the user turn stays last.

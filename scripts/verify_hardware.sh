@@ -37,7 +37,7 @@ trap 'rm -rf "${workspace}"' EXIT
 : "${MANNY_LED_STATE_PATH:=}"
 : "${MANNY_DISPLAY_BRIGHTNESS_PATH:=}"
 : "${MANNY_LLM_BASE_URL:=http://127.0.0.1:11434}"
-: "${MANNY_LLM_MODEL:=gemma4:e2b}"
+: "${MANNY_LLM_MODEL:=gemma3n:e2b}"
 # Exported because some checks run through `bash -c`, and an unexported variable is
 # empty in that child shell — which would make a grep needle empty and match anything.
 export MANNY_LLM_MODEL MANNY_LLM_BASE_URL
