@@ -49,8 +49,9 @@ fi
 
 cat <<EOF
 This installs the Ollama runtime and pulls ${model}.
-The model is distributed under its publisher's licence and prohibited-use policy.
-Review and accept those terms before continuing.
+Review the model's licence before continuing. Gemma 4 is Apache-2.0; earlier Gemma
+generations use Google's Gemma terms and prohibited-use policy, so check the tag you
+are actually pulling rather than assuming either.
 EOF
 read -r -p "Install Ollama and pull ${model}? [y/N] " answer
 [[ "${answer}" == y || "${answer}" == Y ]] || exit 0

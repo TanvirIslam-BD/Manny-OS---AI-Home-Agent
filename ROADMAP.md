@@ -23,3 +23,5 @@
 - [ ] Enable systemd services only after device configuration passes validation.
 
 The desktop simulator and automated suites are authoritative until physical and operational gates are available.
+- [ ] Test whether `litert-lm serve` honours `response_format` with a strict JSON schema. If it does, evaluate replacing Ollama with LiteRT-LM: the same model is 2.6x smaller in that format, Google benchmarks it on a Pi 5 at 1,546 MB peak, and the adapter is already OpenAI-compatible. If it does not, Ollama stays, because grammar-constrained output is what keeps the model from inventing financial figures.
+- [ ] Shorten the ~940-token system instruction. At the measured 133 tok/s prefill it costs about seven seconds on any prompt-cache miss, which is most of the time-to-first-token budget.

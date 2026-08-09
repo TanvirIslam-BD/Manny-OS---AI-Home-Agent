@@ -18,6 +18,46 @@ The runtime binary is checksum-verified: `MANNY_OLLAMA_URL` and `MANNY_OLLAMA_SH
 
 Before relying on a tag, confirm what it is: `ollama show <tag>` reports its parameters, quantisation and whether it advertises vision. A model whose weights include a vision encoder is not the same as a runtime that exposes one, and image support has historically lagged the text path.
 
+## Measured Raspberry Pi 5 performance
+
+Google publishes LiteRT-LM benchmarks for Gemma 4 on a Raspberry Pi 5, CPU backend.
+These are the first vendor numbers for this class of model on this board, and they
+replace several estimates that were previously recorded here:
+
+| | Gemma-4-E2B | Gemma-4-E4B |
+| --- | --- | --- |
+| Model size (LiteRT-LM format) | 2.58 GB | 3.65 GB |
+| Decode | 8 tok/s | 3 tok/s |
+| Prefill | 133 tok/s | 51 tok/s |
+| Time to first token | 7.8 s | 20.5 s |
+| Peak CPU memory | 1,546 MB | 3,069 MB |
+
+Source: https://developers.google.com/edge/litert-lm/models/gemma-4
+
+Three things follow.
+
+Memory is not the constraint it appeared to be, but the artefact matters: the same
+model is 2.58 GB as a LiteRT-LM build and 6.67 GB as an Ollama GGUF. Peak memory of
+1.5 GB fits an 8 GB board with room; the 6.67 GB figure recorded below applies only
+to the GGUF served by Ollama.
+
+Prefill makes the system instruction a latency cost, not a free constant. It measures
+around 940 tokens, which at 133 tok/s is roughly seven seconds — close to the 7.8 s
+time-to-first-token above. That is why `_complete` places the invariant instruction
+first: the runtime keeps it in the prompt cache, and only a cache miss pays for it.
+Shortening it is now a measurable win rather than tidiness.
+
+E4B is not a candidate. Twenty seconds to first token is not a conversation.
+
+Decode at 8 tok/s means a fifty-token reply takes about six seconds to generate. The
+sentence-level streaming in `agent/streaming.py` is what makes that tolerable: the
+first sentence is spoken while the rest is still being decoded, so the wait is a
+sentence rather than a paragraph.
+
+Multi-Token Prediction is available and should be left off here. Google recommends it
+for rewriting, summarising and coding, and notes it can slow down freeform generative
+prompting — which is what conversation is.
+
 ## Fitting the conversational model in 8 GB
 
 An E2B-class model stores far more than it activates: roughly 2B active parameters
