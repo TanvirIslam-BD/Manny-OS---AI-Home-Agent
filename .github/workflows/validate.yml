@@ -42,6 +42,10 @@ jobs:
         working-directory: .
         env:
           PYTHONPATH: apps/core
+          # The profile selects remote_http, which the validator requires a URL for. That
+          # rule is correct and fired here; on a device the URL comes from /opt/manny/.env,
+          # so CI supplies a placeholder rather than weakening the check.
+          MANNY_MCP_URL: https://example.invalid/mcp
 
   ui:
     runs-on: ubuntu-latest
