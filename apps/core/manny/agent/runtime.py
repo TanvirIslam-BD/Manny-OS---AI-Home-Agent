@@ -47,6 +47,9 @@ class IntentModel(Protocol):
     @property
     def status(self) -> str: ...
 
+    # A model that generates its reply may hand it over a sentence at a time through
+    # on_reply_chunk. It is only passed when a caller has somewhere to send it, so an
+    # implementation that produces its reply whole may omit the parameter entirely.
     async def decide(
         self,
         text: str,
@@ -343,9 +346,17 @@ class RuleBasedAgent:
                         recalled_text = "Earlier in our conversation:\n" + notes + "\n\n"
                 model_text = f"{recalled_text}{query.text}" if recalled_text else query.text
                 try:
-                    model_decision = await self._model.decide(
-                        model_text, history, query.language, on_reply_chunk
-                    )
+                    if on_reply_chunk is None:
+                        # Passed only when there is something to stream to, so a model
+                        # that cannot stream does not have to grow the parameter to
+                        # remain usable here.
+                        model_decision = await self._model.decide(
+                            model_text, history, query.language
+                        )
+                    else:
+                        model_decision = await self._model.decide(
+                            model_text, history, query.language, on_reply_chunk
+                        )
                 except RuntimeError:
                     model_decision = await self._fallback_model.decide(
                         query.text, history, query.language
