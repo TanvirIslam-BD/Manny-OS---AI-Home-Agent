@@ -35,7 +35,9 @@ def test_documented_environment_variable_name_is_supported(monkeypatch: pytest.M
 
 
 def test_iana_timezone_is_portable() -> None:
-    assert Settings(user_timezone="America/New_York", _env_file=None).user_timezone == "America/New_York"
+    settings = Settings(user_timezone="America/New_York", _env_file=None)
+
+    assert settings.user_timezone == "America/New_York"
 
 
 def test_remote_mcp_requires_https() -> None:
